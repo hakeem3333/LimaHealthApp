@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "LimaHealthApp",
-    "slug": "LimaHealthApp",
+    "name": "LimaHealth",
+    "slug": "LimaHealth",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "limahealthapp",
+    "scheme": "limahealth",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -38,10 +38,11 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
-      "typedRoutes": true,
       "reactCompiler": true
     }
   }
