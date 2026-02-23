@@ -3,49 +3,39 @@ import { View, Text, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider } from "../contexts/AuthContext";
+// 1. Import these two
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function RootLayout() {
   const [loading, setLoading] = useState(true);
 
-  // Show splash for 2 seconds
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(timer);
   }, []);
 
   if (loading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "#4F46E5",
-        }}
-      >
-        <Text style={{ fontSize: 28, fontWeight: "bold", color: "#fff" }}>
-          LimaHealth
-        </Text>
-        <ActivityIndicator
-          size="large"
-          color="#fff"
-          style={{ marginTop: 20 }}
-        />
-      </View>
-    );
+    /* ... keep your existing loading View ... */
   }
 
   return (
     <AuthProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="moodLog" />
-          <Stack.Screen name="trends" />
-          <Stack.Screen name="resources" />
-          <Stack.Screen name="settings" />
-        </Stack>
-      </GestureHandlerRootView>
+      <SafeAreaProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          {/* 2. Wrap the Stack in SafeAreaView */}
+          {/* edges={['top']} ensures it only pads the top status bar */}
+          <SafeAreaView
+            style={{ flex: 1, backgroundColor: "#020617" }}
+            edges={["top"]}
+          >
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="login" />
+              <Stack.Screen name="(student)" />
+            </Stack>
+          </SafeAreaView>
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
     </AuthProvider>
   );
 }

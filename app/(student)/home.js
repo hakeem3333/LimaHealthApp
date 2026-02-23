@@ -266,7 +266,7 @@ export default function BioInsightsScreen() {
             <View style={styles.aiHeader}>
               <View style={styles.aiBadge}>
                 <MaterialCommunityIcons
-                  name="sparkles"
+                  name="auto-fix"
                   size={12}
                   color="#DDD6FE"
                 />
@@ -294,7 +294,7 @@ export default function BioInsightsScreen() {
           <ProgressRing
             percentage={84}
             color="#10B981"
-            icon="footprint"
+            icon="walk"
             label="Steps"
           />
           <ProgressRing
