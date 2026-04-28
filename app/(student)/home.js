@@ -1,215 +1,4 @@
-// import React, { useState, useEffect } from "react";
-// import {
-//   Platform,
-//   View,
-//   StyleSheet,
-//   Text,
-//   ScrollView,
-//   TouchableOpacity,
-//   ActivityIndicator,
-// } from "react-native";
-// import * as WebBrowser from "expo-web-browser";
-// import { MaterialCommunityIcons } from "@expo/vector-icons";
-// import FitbitOnboardingModal from "../../components/FitbitOnboardingModal";
-// import { useAuth } from "../../contexts/AuthContext";
-
-// export default function Home() {
-//   const [isModalVisible, setIsModalVisible] = useState(false);
-//   const [isLoading, setIsLoading] = useState(true);
-//   const { user } = useAuth();
-
-//   const BASE_URL = "https://766c-102-89-82-128.ngrok-free.app";
-
-//   /**
-//    * 1. PERSISTENT CHECK
-//    * Runs on mount to see if the user has already linked Fitbit in the DB.
-//    */
-//   useEffect(() => {
-//     const checkFitbitStatus = async () => {
-//       if (!user?.id) return;
-
-//       try {
-//         console.log("Checking status for user:", user.id);
-//         const response = await fetch(
-//           `${BASE_URL}/api/v1/fitbit/status/${user.id}`,
-//           {
-//             method: "GET",
-//             headers: {
-//               Accept: "application/json",
-//               "Content-Type": "application/json",
-//               "ngrok-skip-browser-warning": "true",
-//             },
-//           },
-//         );
-
-//         // Read body once as text to prevent "stream already read" error
-//         const rawText = await response.text();
-//         const data = JSON.parse(rawText);
-
-//         console.log("Status Check Result:", data);
-
-//         // Hide modal if linked, show if not
-//         setIsModalVisible(!data.isLinked);
-//       } catch (error) {
-//         console.error("Failed to check Fitbit status", error);
-//         setIsModalVisible(true); // Fallback to showing modal
-//       } finally {
-//         setIsLoading(false);
-//       }
-//     };
-
-//     checkFitbitStatus();
-//   }, [user?.id]);
-
-//   /**
-//    * 2. OAUTH FLOW
-//    * Triggered when user clicks "Connect Fitbit" in the modal.
-//    */
-//   const handleFitbitConnect = async () => {
-//     const redirectUri =
-//       Platform.OS === "web"
-//         ? "http://localhost:8081/home"
-//         : "limahealth://home";
-
-//     try {
-//       const authUrl = `${BASE_URL}/api/v1/fitbit/auth?userId=${user?.id}`;
-
-//       // Opens the Fitbit Login in a secure popup/browser
-//       const result = await WebBrowser.openAuthSessionAsync(
-//         authUrl,
-//         redirectUri,
-//       );
-
-//       // If they finished or are on web, hide modal.
-//       // The useEffect will handle the persistent state on the next refresh.
-//       if (result.type === "success" || Platform.OS === "web") {
-//         setIsModalVisible(false);
-//       }
-//     } catch (error) {
-//       console.error("Fitbit Auth Error:", error);
-//     }
-//   };
-
-//   if (isLoading) {
-//     return (
-//       <View style={[styles.container, { justifyContent: "center" }]}>
-//         <ActivityIndicator size="large" color="#6B21A8" />
-//       </View>
-//     );
-//   }
-
-//   // --- UI Components ---
-//   const StatCard = ({ title, value, unit, icon, color }) => (
-//     <View style={styles.card}>
-//       <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
-//         <MaterialCommunityIcons name={icon} size={28} color={color} />
-//       </View>
-//       <View>
-//         <Text style={styles.cardTitle}>{title}</Text>
-//         <Text style={styles.cardValue}>
-//           {value}
-//           <Text style={styles.cardUnit}> {unit}</Text>
-//         </Text>
-//       </View>
-//     </View>
-//   );
-
-//   return (
-//     <ScrollView style={styles.container}>
-//       <View style={styles.header}>
-//         <Text style={styles.welcomeText}>Welcome back,</Text>
-//         <Text style={styles.nameText}>{user?.firstName || "Student"} 👋</Text>
-//       </View>
-
-//       <View style={styles.statsGrid}>
-//         <StatCard
-//           title="Heart Rate"
-//           value="72"
-//           unit="bpm"
-//           icon="heart-pulse"
-//           color="#EF4444"
-//         />
-//         <StatCard
-//           title="Sleep"
-//           value="7.5"
-//           unit="hrs"
-//           icon="moon-waning-crescent"
-//           color="#8B5CF6"
-//         />
-//         <StatCard
-//           title="Steps"
-//           value="8,432"
-//           unit="steps"
-//           icon="walk"
-//           color="#10B981"
-//         />
-//         <StatCard
-//           title="Stress Level"
-//           value="Low"
-//           unit=""
-//           icon="brain"
-//           color="#3B82F6"
-//         />
-//       </View>
-
-//       <TouchableOpacity style={styles.syncButton}>
-//         <MaterialCommunityIcons name="cached" size={20} color="#6B21A8" />
-//         <Text style={styles.syncButtonText}>Sync Fitbit Data</Text>
-//       </TouchableOpacity>
-
-//       <FitbitOnboardingModal
-//         isVisible={isModalVisible}
-//         onClose={() => setIsModalVisible(false)}
-//         onConnect={handleFitbitConnect}
-//       />
-//     </ScrollView>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: { flex: 1, backgroundColor: "#FAF5FF" },
-//   header: { padding: 24, paddingTop: 40 },
-//   welcomeText: { fontSize: 16, color: "#6B7280", fontWeight: "500" },
-//   nameText: { fontSize: 28, fontWeight: "bold", color: "#1F2937" },
-//   statsGrid: {
-//     paddingHorizontal: 20,
-//     flexDirection: "row",
-//     flexWrap: "wrap",
-//     justifyContent: "space-between",
-//   },
-//   card: {
-//     backgroundColor: "#FFF",
-//     width: "48%",
-//     padding: 16,
-//     borderRadius: 20,
-//     marginBottom: 16,
-//     shadowColor: "#6B21A8",
-//     shadowOffset: { width: 0, height: 4 },
-//     shadowOpacity: 0.05,
-//     shadowRadius: 10,
-//     elevation: 2,
-//     flexDirection: "row",
-//     alignItems: "center",
-//   },
-//   iconContainer: { padding: 10, borderRadius: 12, marginRight: 12 },
-//   cardTitle: { fontSize: 12, color: "#6B7280", fontWeight: "600" },
-//   cardValue: { fontSize: 18, fontWeight: "bold", color: "#111827" },
-//   cardUnit: { fontSize: 12, color: "#9CA3AF", fontWeight: "400" },
-//   syncButton: {
-//     margin: 20,
-//     padding: 16,
-//     borderRadius: 15,
-//     backgroundColor: "#F3E8FF",
-//     flexDirection: "row",
-//     justifyContent: "center",
-//     alignItems: "center",
-//     borderWidth: 1,
-//     borderColor: "#E9D5FF",
-//   },
-//   syncButtonText: { marginLeft: 8, color: "#6B21A8", fontWeight: "700" },
-// });
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -217,53 +6,194 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { LineChart } from "react-native-gifted-charts";
+import * as WebBrowser from "expo-web-browser";
+
+// Context & Components
+import { useAuth } from "../../contexts/AuthContext";
+import FitbitOnboardingModal from "../../components/FitbitOnboardingModal";
 
 const { width } = Dimensions.get("window");
 
-export default function BioInsightsScreen() {
-  // Mock state for the AI condition
-  const [isStressed, setIsStressed] = useState(true);
-  const [lastSynced, setLastSynced] = useState("2 mins ago");
+const USE_MOCK_DATA = true;
 
-  const hrData = [
-    { value: 65, label: "6am" },
-    { value: 88, label: "9am" },
-    { value: 72, label: "12pm" },
-    { value: 95, label: "3pm" },
-    { value: 110, label: "6pm" },
-    { value: 68, label: "9pm" },
-  ];
+const MOCK_HEALTH_DATA = {
+  heartRate: 74,
+  steps: 8432,
+  calories: 1840,
+  sleep: 7.2,
+  heartRateSeries: [
+    { value: 62, label: "6am" },
+    { value: 75, label: "9am" },
+    { value: 92, label: "12pm" },
+    { value: 115, label: "3pm" },
+    { value: 85, label: "6pm" },
+    { value: 70, label: "9pm" },
+    { value: 65, label: "12am" },
+  ],
+};
+
+// UPDATED ICON NAMES FOR MATERIAL COMMUNITY ICONS
+const MOOD_OPTIONS = [
+  { emoji: "emoticon-excited-outline", label: "Great", color: "#10B981" },
+  { emoji: "emoticon-happy-outline", label: "Good", color: "#8B5CF6" },
+  { emoji: "emoticon-neutral-outline", label: "Okay", color: "#F59E0B" },
+  { emoji: "emoticon-sad-outline", label: "Low", color: "#EF4444" },
+];
+
+export default function BioInsightsScreen() {
+  const { user } = useAuth();
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+  const [isStressed, setIsStressed] = useState(true);
+  const [lastSynced, setLastSynced] = useState("Checking...");
+  const [selectedMood, setSelectedMood] = useState(null);
+
+  const [vitals, setVitals] = useState({
+    heartRate: 0,
+    steps: 0,
+    calories: 0,
+    sleep: 0,
+    heartRateSeries: [{ value: 0, label: "..." }],
+  });
+
+  const BASE_URL = "https://3466-102-89-84-114.ngrok-free.app";
+
+  const fetchVitals = async () => {
+    try {
+      let healthData;
+      if (USE_MOCK_DATA) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        healthData = MOCK_HEALTH_DATA;
+      } else {
+        const response = await fetch(
+          `${BASE_URL}/api/v1/fitbit/data/${user?.id}`,
+          {
+            headers: {
+              Accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+            },
+          },
+        );
+        healthData = await response.json();
+      }
+
+      setVitals({
+        heartRate: healthData.heartRate || 0,
+        steps: healthData.steps || 0,
+        calories: healthData.calories || 0,
+        sleep: healthData.sleep || 0,
+        heartRateSeries:
+          healthData.heartRateSeries || MOCK_HEALTH_DATA.heartRateSeries,
+      });
+
+      setLastSynced(
+        new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      );
+    } catch (err) {
+      console.error("Error fetching vitals:", err);
+    }
+  };
+
+  useEffect(() => {
+    const checkFitbitStatus = async () => {
+      if (!user?.id && !USE_MOCK_DATA) return;
+      try {
+        let statusData = USE_MOCK_DATA ? { isLinked: true } : null;
+        if (!USE_MOCK_DATA) {
+          const response = await fetch(
+            `${BASE_URL}/api/v1/fitbit/status/${user.id}`,
+            {
+              method: "GET",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                "ngrok-skip-browser-warning": "true",
+              },
+            },
+          );
+          statusData = await response.json();
+        }
+        setIsModalVisible(!statusData.isLinked);
+        if (statusData.isLinked) await fetchVitals();
+      } catch (error) {
+        console.error("Failed to check Fitbit status", error);
+      } finally {
+        setIsCheckingStatus(false);
+      }
+    };
+    checkFitbitStatus();
+  }, [user?.id]);
+
+  const handleFitbitConnect = async () => {
+    if (USE_MOCK_DATA) {
+      setIsModalVisible(false);
+      setIsCheckingStatus(true);
+      setTimeout(fetchVitals, 1000);
+      return;
+    }
+    const redirectUri =
+      Platform.OS === "web"
+        ? "http://localhost:8081/home"
+        : "limahealth://home";
+    try {
+      const authUrl = `${BASE_URL}/api/v1/fitbit/auth?userId=${user?.id}`;
+      const result = await WebBrowser.openAuthSessionAsync(
+        authUrl,
+        redirectUri,
+      );
+      if (result.type === "success") {
+        setIsModalVisible(false);
+        setIsCheckingStatus(true);
+        setTimeout(fetchVitals, 2000);
+      }
+    } catch (error) {
+      console.error("Fitbit Auth Error:", error);
+    }
+  };
+
+  if (isCheckingStatus) {
+    return (
+      <View style={[styles.container, { justifyContent: "center" }]}>
+        <ActivityIndicator size="large" color="#6D28D9" />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* 1. HEADER & SYNC STATUS */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.welcomeText}>Hi, Student</Text>
-          <View style={styles.syncRow}>
-            <MaterialCommunityIcons name="cached" size={14} color="#10B981" />
-            <Text style={styles.syncText}>Fitbit synced {lastSynced}</Text>
+    <View style={{ flex: 1 }}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.welcomeText}>
+              Hi, {user?.firstName || "Student"}
+            </Text>
+            <View style={styles.syncRow}>
+              <MaterialCommunityIcons name="cached" size={14} color="#10B981" />
+              <Text style={styles.syncText}>Fitbit synced {lastSynced}</Text>
+            </View>
           </View>
+          <TouchableOpacity style={styles.profileCircle}>
+            <MaterialCommunityIcons name="account" size={24} color="#FFF" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.profileCircle}>
-          <MaterialCommunityIcons name="account" size={24} color="#FFF" />
-        </TouchableOpacity>
-      </View>
 
-      {/* 2. AI RECOMMENDATION HERO (Conditional) */}
-      {isStressed && (
-        <TouchableOpacity activeOpacity={0.9}>
-          <LinearGradient
-            colors={["#6D28D9", "#4C1D95"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.aiHero}
-          >
-            <View style={styles.aiHeader}>
+        {/* AI HERO */}
+        {isStressed && (
+          <TouchableOpacity activeOpacity={0.9}>
+            <LinearGradient
+              colors={["#6D28D9", "#4C1D95"]}
+              style={styles.aiHero}
+            >
               <View style={styles.aiBadge}>
                 <MaterialCommunityIcons
                   name="auto-fix"
@@ -272,76 +202,127 @@ export default function BioInsightsScreen() {
                 />
                 <Text style={styles.aiBadgeText}>AI INSIGHT</Text>
               </View>
-            </View>
-            <Text style={styles.aiTitle}>High Stress Detected</Text>
-            <Text style={styles.aiDesc}>
-              Your heart rate was elevated during your study block. Want to try
-              a 5-min breathing exercise or book a counselor?
-            </Text>
-            <View style={styles.aiActionRow}>
-              <View style={styles.aiBtnPrimary}>
-                <Text style={styles.aiBtnText}>Book Now</Text>
+              <Text style={styles.aiTitle}>High Stress Detected</Text>
+              <Text style={styles.aiDesc}>
+                Your heart rate was elevated during your study block. Want to
+                try a 5-min breathing exercise?
+              </Text>
+              <View style={styles.aiActionRow}>
+                <View style={styles.aiBtnPrimary}>
+                  <TouchableOpacity
+                    style={styles.aiBtnPrimary}
+                    onPress={() => navigation.navigate("CounselingBooking")}
+                  >
+                    <Text style={styles.aiBtnText}>Book Now</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.aiBtnSecondary}>Dismiss</Text>
               </View>
-              <Text style={styles.aiBtnSecondary}>Dismiss</Text>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
-      {/* 3. DAILY PROGRESS RINGS (Conceptual) */}
-      <View style={styles.ringsContainer}>
-        <View style={styles.ringCard}>
-          <ProgressRing
-            percentage={84}
-            color="#10B981"
-            icon="walk"
-            label="Steps"
-          />
-          <ProgressRing
-            percentage={60}
-            color="#F59E0B"
-            icon="fire"
-            label="Kcal"
-          />
-          <ProgressRing
-            percentage={90}
-            color="#6366F1"
-            icon="moon-waning-crescent"
-            label="Sleep"
+        {/* RESPONSIVE MOOD LOG SECTION */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Daily Reflection</Text>
+          <Text style={styles.sectionSub}>How are you feeling right now?</Text>
+          <View style={styles.moodGrid}>
+            {MOOD_OPTIONS.map((mood, index) => (
+              <TouchableOpacity
+                key={index}
+                onPress={() => setSelectedMood(mood.label)}
+                style={[
+                  styles.moodItem,
+                  selectedMood === mood.label && {
+                    backgroundColor: mood.color + "25",
+                    borderColor: mood.color,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={mood.emoji}
+                  size={32}
+                  color={selectedMood === mood.label ? mood.color : "#475569"}
+                />
+                <Text
+                  style={[
+                    styles.moodLabel,
+                    selectedMood === mood.label && { color: "#FFF" },
+                  ]}
+                >
+                  {mood.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* PROGRESS RINGS */}
+        <View style={styles.ringsContainer}>
+          <View style={styles.ringCard}>
+            <ProgressRing
+              percentage={Math.min(
+                Math.round((vitals.steps / 10000) * 100),
+                100,
+              )}
+              color="#10B981"
+              icon="walk"
+              label="Steps"
+            />
+            <ProgressRing
+              percentage={Math.min(
+                Math.round((vitals.calories / 2500) * 100),
+                100,
+              )}
+              color="#F59E0B"
+              icon="fire"
+              label="Kcal"
+            />
+            <ProgressRing
+              percentage={Math.min(Math.round((vitals.sleep / 8) * 100), 100)}
+              color="#6366F1"
+              icon="moon-waning-crescent"
+              label="Sleep"
+            />
+          </View>
+        </View>
+
+        {/* CHART */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <Text style={styles.chartTitle}>Heart Rate Trend</Text>
+            <Text style={styles.chartSub}>{vitals.heartRate} avg bpm</Text>
+          </View>
+          <LineChart
+            data={vitals.heartRateSeries}
+            areaChart
+            curved
+            height={180}
+            hideDataPoints
+            color="#EF4444"
+            thickness={3}
+            startFillColor="rgba(239, 68, 68, 0.3)"
+            endFillColor="rgba(239, 68, 68, 0.01)"
+            initialSpacing={10}
+            xAxisColor="transparent"
+            yAxisColor="transparent"
+            yAxisTextStyle={{ color: "#64748B", fontSize: 10 }}
+            rulesColor="#1E293B"
           />
         </View>
-      </View>
 
-      {/* 4. VISUAL VITALS (Heart Rate Chart) */}
-      <View style={styles.chartCard}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.chartTitle}>Heart Rate Trend</Text>
-          <Text style={styles.chartSub}>72 avg bpm</Text>
-        </View>
-        <LineChart
-          data={hrData}
-          areaChart
-          curved
-          height={180}
-          hideDataPoints
-          color="#EF4444"
-          thickness={3}
-          startFillColor="rgba(239, 68, 68, 0.3)"
-          endFillColor="rgba(239, 68, 68, 0.01)"
-          initialSpacing={10}
-          xAxisColor="transparent"
-          yAxisColor="transparent"
-          yAxisTextStyle={{ color: "#64748B", fontSize: 10 }}
-          rulesColor="#1E293B"
-        />
-      </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      <FitbitOnboardingModal
+        isVisible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onConnect={handleFitbitConnect}
+      />
+    </View>
   );
 }
 
-// Helper for Progress Rings
 const ProgressRing = ({ percentage, color, icon, label }) => (
   <View style={styles.ringItem}>
     <View style={[styles.ringOuter, { borderColor: color + "30" }]}>
@@ -379,9 +360,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#334155",
   },
-
   aiHero: { padding: 20, borderRadius: 28, marginBottom: 25 },
-  aiHeader: { flexDirection: "row", marginBottom: 12 },
   aiBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -389,6 +368,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: "flex-start",
+    marginBottom: 10,
   },
   aiBadgeText: {
     color: "#DDD6FE",
@@ -414,6 +395,43 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
 
+  sectionCard: {
+    backgroundColor: "#0F172A",
+    padding: 20,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+    marginBottom: 25,
+  },
+  sectionTitle: { color: "#F8FAFC", fontSize: 18, fontWeight: "bold" },
+  sectionSub: {
+    color: "#475569",
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 15,
+  },
+  moodGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  moodItem: {
+    width: "23%",
+    aspectRatio: 1,
+    backgroundColor: "#1E293B",
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  moodLabel: {
+    color: "#94A3B8",
+    fontSize: 10,
+    marginTop: 8,
+    fontWeight: "600",
+  },
+
   ringsContainer: { marginBottom: 25 },
   ringCard: {
     backgroundColor: "#0F172A",
@@ -436,7 +454,6 @@ const styles = StyleSheet.create({
   },
   ringVal: { color: "#F8FAFC", fontWeight: "bold", fontSize: 14 },
   ringLabel: { color: "#64748B", fontSize: 11, marginTop: 2 },
-
   chartCard: {
     backgroundColor: "#0F172A",
     padding: 20,

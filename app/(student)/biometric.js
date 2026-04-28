@@ -220,7 +220,7 @@ export default function BioInsights() {
   const [metrics, setMetrics] = useState(null);
   const [showAIAlert, setShowAIAlert] = useState(false);
 
-  const BASE_URL = "https://766c-102-89-82-128.ngrok-free.app";
+  const BASE_URL = "https://3466-102-89-84-114.ngrok-free.app";
 
   useEffect(() => {
     fetchData();
