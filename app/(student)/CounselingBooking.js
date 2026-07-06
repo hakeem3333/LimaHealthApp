@@ -1,288 +1,225 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Dimensions,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Alert,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
 
-const { width } = Dimensions.get("window");
+import { apiFetch } from "../../api/client";
+import { useAuth } from "../../contexts/AuthContext";
 
-const DAYS = [
-  { day: "Mon", date: "28" },
-  { day: "Tue", date: "29" },
-  { day: "Wed", date: "30" },
-  { day: "Thu", date: "01" },
-  { day: "Fri", date: "02" },
-];
+// Generate next 5 weekdays from today
+function getNextWeekdays(count = 5) {
+  const days = [];
+  const d = new Date();
+  while (days.length < count) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) {
+      days.push(new Date(d));
+    }
+  }
+  return days;
+}
 
-const COUNSELORS = [
-  {
-    id: 1,
-    name: "Dr. Sarah Jenkins",
-    specialty: "Anxiety & Stress",
-    rating: "4.9",
-    image: "https://i.pravatar.cc/150?u=sarah",
-  },
-  {
-    id: 2,
-    name: "Marcus Thorne",
-    specialty: "Academic Performance",
-    rating: "4.8",
-    image: "https://i.pravatar.cc/150?u=marcus",
-  },
-];
-
-const TIMES = ["9:00 AM", "10:30 AM", "1:00 PM", "2:30 PM", "4:00 PM"];
+const TIME_SLOTS = ["09:00", "10:30", "13:00", "14:30", "16:00"];
 
 export default function CounselingBooking() {
-  const navigation = useNavigation();
-  const [selectedDate, setSelectedDate] = useState("28");
-  const [selectedCounselor, setSelectedCounselor] = useState(1);
-  const [selectedTime, setSelectedTime] = useState(null);
+  const router = useRouter();
+  const { user, memberLabel, supportLabel, supportsLabel } = useAuth();
+
+  const [counselors, setCounselors]         = useState([]);
+  const [selectedCounselor, setSelectedCounselor] = useState(null);
+  const [selectedDate, setSelectedDate]     = useState(null);
+  const [selectedTime, setSelectedTime]     = useState(null);
+  const [loading, setLoading]               = useState(true);
+  const [booking, setBooking]               = useState(false);
+
+  const weekdays = getNextWeekdays(5);
+
+  useEffect(() => {
+    const fetchCounselors = async () => {
+      try {
+        const data = await apiFetch("/users?role=COUNSELOR");
+        setCounselors(data.data || data || []);
+      } catch (err) {
+        console.error(`Could not load ${supportsLabel.toLowerCase()}:`, err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCounselors();
+  }, []);
+
+  const handleBook = async () => {
+    if (!selectedCounselor || !selectedDate || !selectedTime) {
+      Alert.alert("Incomplete", "Please select a counselor, date, and time slot.");
+      return;
+    }
+
+    const [hour, minute] = selectedTime.split(":").map(Number);
+    const startTime = new Date(selectedDate);
+    startTime.setHours(hour, minute, 0, 0);
+    const endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + 50); // 50-minute session
+
+    setBooking(true);
+    try {
+      await apiFetch("/appointments", {
+        method: "POST",
+        body: JSON.stringify({
+          counselorId: selectedCounselor.id,
+          startTime:   startTime.toISOString(),
+          endTime:     endTime.toISOString(),
+          reason:      `${memberLabel}-initiated booking`,
+        }),
+      });
+      Toast.show({ type: "success", text1: "Session Requested!", text2: "Your counselor will confirm shortly." });
+      setTimeout(() => router.back(), 1500);
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Booking failed", text2: err.message });
+    } finally {
+      setBooking(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#6D28D9" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <MaterialCommunityIcons name="chevron-left" size={28} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Book Session</Text>
+        <Text style={styles.headerTitle}>Book a {supportLabel}</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
-      >
-        {/* DATE SELECTOR */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Date</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.dateList}
-          >
-            {DAYS.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => setSelectedDate(item.date)}
-                style={[
-                  styles.dateCard,
-                  selectedDate === item.date && styles.activeDateCard,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.dateDay,
-                    selectedDate === item.date && styles.activeText,
-                  ]}
-                >
-                  {item.day}
-                </Text>
-                <Text
-                  style={[
-                    styles.dateNum,
-                    selectedDate === item.date && styles.activeText,
-                  ]}
-                >
-                  {item.date}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
-        {/* COUNSELOR SELECTION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Available Counselors</Text>
-          {COUNSELORS.map((c) => (
+        {/* COUNSELOR PICKER */}
+        <Text style={styles.label}>Choose a {supportLabel}</Text>
+        {counselors.length === 0 ? (
+          <Text style={styles.emptyText}>No available {supportsLabel.toLowerCase()} found.</Text>
+        ) : (
+          counselors.map((c) => (
             <TouchableOpacity
               key={c.id}
-              onPress={() => setSelectedCounselor(c.id)}
-              style={[
-                styles.counselorCard,
-                selectedCounselor === c.id && styles.activeCounselorCard,
-              ]}
+              style={[styles.counselorCard, selectedCounselor?.id === c.id && styles.selectedCard]}
+              onPress={() => setSelectedCounselor(c)}
             >
-              <Image source={{ uri: c.image }} style={styles.avatar} />
-              <View style={styles.counselorInfo}>
-                <Text style={styles.counselorName}>{c.name}</Text>
-                <Text style={styles.counselorSpecialty}>{c.specialty}</Text>
-                <View style={styles.ratingRow}>
-                  <MaterialCommunityIcons
-                    name="star"
-                    size={14}
-                    color="#F59E0B"
-                  />
-                  <Text style={styles.ratingText}>{c.rating}</Text>
-                </View>
+              <View style={styles.counselorAvatar}>
+                <Text style={styles.avatarText}>{c.firstName?.charAt(0)}</Text>
               </View>
-              <MaterialCommunityIcons
-                name={
-                  selectedCounselor === c.id
-                    ? "radiobox-marked"
-                    : "radiobox-blank"
-                }
-                size={24}
-                color={selectedCounselor === c.id ? "#6D28D9" : "#475569"}
-              />
+              <View style={styles.counselorInfo}>
+                <Text style={styles.counselorName}>{c.firstName} {c.lastName}</Text>
+                <Text style={styles.counselorSpec}>{c.email}</Text>
+              </View>
+              {selectedCounselor?.id === c.id && (
+                <MaterialCommunityIcons name="check-circle" size={22} color="#6D28D9" />
+              )}
             </TouchableOpacity>
-          ))}
-        </View>
+          ))
+        )}
 
-        {/* TIME SLOTS */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Available Times</Text>
-          <View style={styles.timeGrid}>
-            {TIMES.map((time) => (
+        {/* DATE PICKER */}
+        <Text style={styles.label}>Select a Date</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateRow}>
+          {weekdays.map((date, i) => {
+            const isSelected = selectedDate?.toDateString() === date.toDateString();
+            return (
               <TouchableOpacity
-                key={time}
-                onPress={() => setSelectedTime(time)}
-                style={[
-                  styles.timeChip,
-                  selectedTime === time && styles.activeTimeChip,
-                ]}
+                key={i}
+                style={[styles.dateCard, isSelected && styles.selectedDateCard]}
+                onPress={() => { setSelectedDate(date); setSelectedTime(null); }}
               >
-                <Text
-                  style={[
-                    styles.timeText,
-                    selectedTime === time && styles.activeText,
-                  ]}
-                >
-                  {time}
+                <Text style={[styles.dayText, isSelected && styles.selectedText]}>
+                  {date.toLocaleDateString("en", { weekday: "short" })}
+                </Text>
+                <Text style={[styles.dateNum, isSelected && styles.selectedText]}>
+                  {date.getDate()}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+            );
+          })}
+        </ScrollView>
+
+        {/* TIME SLOTS */}
+        {selectedDate && (
+          <>
+            <Text style={styles.label}>Available Times</Text>
+            <View style={styles.timeGrid}>
+              {TIME_SLOTS.map((time) => (
+                <TouchableOpacity
+                  key={time}
+                  style={[styles.timeChip, selectedTime === time && styles.selectedTimeChip]}
+                  onPress={() => setSelectedTime(time)}
+                >
+                  <Text style={[styles.timeChipText, selectedTime === time && styles.selectedText]}>
+                    {time}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
       </ScrollView>
 
-      {/* FIXED FOOTER BUTTON */}
+      {/* BOOK BUTTON */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.confirmBtn, !selectedTime && { opacity: 0.5 }]}
-          disabled={!selectedTime}
-          onPress={() => alert("Appointment Confirmed!")}
+          style={[styles.bookBtn, (!selectedCounselor || !selectedDate || !selectedTime) && styles.bookBtnDisabled]}
+          onPress={handleBook}
+          disabled={booking || !selectedCounselor || !selectedDate || !selectedTime}
         >
-          <Text style={styles.confirmBtnText}>Confirm Appointment</Text>
+          {booking ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.bookBtnText}>Request Session</Text>
+          )}
         </TouchableOpacity>
       </View>
+
+      <Toast />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#020617" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  headerTitle: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1E293B",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  section: { marginTop: 25, paddingHorizontal: 20 },
-  sectionTitle: {
-    color: "#94A3B8",
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 15,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-
-  dateList: { flexDirection: "row" },
-  dateCard: {
-    width: 60,
-    height: 80,
-    backgroundColor: "#0F172A",
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-  },
-  activeDateCard: { backgroundColor: "#6D28D9", borderColor: "#8B5CF6" },
-  dateDay: { color: "#64748B", fontSize: 12 },
-  dateNum: { color: "#FFF", fontSize: 18, fontWeight: "bold", marginTop: 4 },
-  activeText: { color: "#FFF" },
-
-  counselorCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0F172A",
-    padding: 15,
-    borderRadius: 20,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-  },
-  activeCounselorCard: { borderColor: "#6D28D9", backgroundColor: "#1E1B4B" },
-  avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
-  counselorInfo: { flex: 1 },
-  counselorName: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
-  counselorSpecialty: { color: "#64748B", fontSize: 13, marginTop: 2 },
-  ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
-  ratingText: {
-    color: "#F8FAFC",
-    fontSize: 12,
-    marginLeft: 4,
-    fontWeight: "600",
-  },
-
-  timeGrid: { flexDirection: "row", flexWrap: "wrap" },
-  timeChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: "#0F172A",
-    borderRadius: 12,
-    marginRight: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-  },
-  activeTimeChip: { backgroundColor: "#6D28D9", borderColor: "#8B5CF6" },
-  timeText: { color: "#94A3B8", fontSize: 14, fontWeight: "600" },
-
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    padding: 20,
-    backgroundColor: "#020617",
-    borderTopWidth: 1,
-    borderTopColor: "#1E293B",
-  },
-  confirmBtn: {
-    backgroundColor: "#6D28D9",
-    paddingVertical: 18,
-    borderRadius: 18,
-    alignItems: "center",
-    shadowColor: "#6D28D9",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  confirmBtnText: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
+  container:        { flex: 1, backgroundColor: "#020617" },
+  center:           { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#020617" },
+  header:           { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20, paddingTop: 60 },
+  backBtn:          { width: 40, height: 40, borderRadius: 20, backgroundColor: "#1E293B", justifyContent: "center", alignItems: "center" },
+  headerTitle:      { color: "#F8FAFC", fontSize: 20, fontWeight: "800" },
+  label:            { color: "#94A3B8", fontSize: 13, fontWeight: "700", letterSpacing: 0.5, paddingHorizontal: 20, marginBottom: 10, marginTop: 20 },
+  emptyText:        { color: "#475569", fontSize: 14, paddingHorizontal: 20 },
+  counselorCard:    { flexDirection: "row", alignItems: "center", backgroundColor: "#0F172A", marginHorizontal: 20, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: "#1E293B" },
+  selectedCard:     { borderColor: "#6D28D9", backgroundColor: "#1E1035" },
+  counselorAvatar:  { width: 44, height: 44, borderRadius: 22, backgroundColor: "#1E293B", justifyContent: "center", alignItems: "center", marginRight: 12 },
+  avatarText:       { color: "#8B5CF6", fontSize: 18, fontWeight: "700" },
+  counselorInfo:    { flex: 1 },
+  counselorName:    { color: "#F8FAFC", fontSize: 15, fontWeight: "700" },
+  counselorSpec:    { color: "#64748B", fontSize: 13, marginTop: 2 },
+  dateRow:          { paddingHorizontal: 20 },
+  dateCard:         { alignItems: "center", backgroundColor: "#0F172A", borderRadius: 14, padding: 14, marginRight: 10, minWidth: 56, borderWidth: 1, borderColor: "#1E293B" },
+  selectedDateCard: { backgroundColor: "#6D28D9", borderColor: "#6D28D9" },
+  dayText:          { color: "#64748B", fontSize: 12, fontWeight: "600" },
+  dateNum:          { color: "#F8FAFC", fontSize: 18, fontWeight: "800", marginTop: 4 },
+  selectedText:     { color: "#FFF" },
+  timeGrid:         { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 20, gap: 10 },
+  timeChip:         { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#0F172A", borderRadius: 12, borderWidth: 1, borderColor: "#1E293B" },
+  selectedTimeChip: { backgroundColor: "#6D28D9", borderColor: "#6D28D9" },
+  timeChipText:     { color: "#94A3B8", fontSize: 14, fontWeight: "600" },
+  footer:           { position: "absolute", bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: "#020617", borderTopWidth: 1, borderColor: "#1E293B" },
+  bookBtn:          { backgroundColor: "#6D28D9", borderRadius: 16, paddingVertical: 16, alignItems: "center" },
+  bookBtnDisabled:  { backgroundColor: "#1E293B" },
+  bookBtnText:      { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

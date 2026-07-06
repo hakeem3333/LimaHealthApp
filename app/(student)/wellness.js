@@ -1,299 +1,216 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  FlatList,
-  Dimensions,
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, FlatList, ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
+import { useAuth } from "../../contexts/AuthContext";
+import { apiFetch } from "../../api/client";
+import { BASE } from "../../utils/orgTheme";
 
-const { width } = Dimensions.get("window");
+export default function WellnessScreen() {
+  const { user, theme, supportLabel } = useAuth();
+  const router = useRouter();
 
-// Mock Data for UI Generation
-const UPCOMING_SESSIONS = [
-  {
-    id: "1",
-    counselor: "Dr. Sarah Smith",
-    date: "Feb 22",
-    time: "10:00 AM",
-    status: "CONFIRMED",
-  },
-  {
-    id: "2",
-    counselor: "Prof. James Wilson",
-    date: "Feb 25",
-    time: "2:30 PM",
-    status: "PENDING",
-  },
-];
+  const [appointments, setAppointments] = useState([]);
+  const [counselors,   setCounselors]   = useState([]);
+  const [pastSessions, setPastSessions] = useState([]);
+  const [loading,      setLoading]      = useState(true);
 
-const COUNSELORS = [
-  {
-    id: "1",
-    name: "Dr. Sarah Smith",
-    specialty: "Anxiety & Stress",
-    available: "Today",
-  },
-  {
-    id: "2",
-    name: "Prof. James Wilson",
-    specialty: "Academic Focus",
-    available: "Tomorrow",
-  },
-];
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [appts, couns] = await Promise.all([
+        apiFetch(`/appointments?userId=${user?.id}`).catch(() => []),
+        apiFetch("/users?role=COUNSELOR").catch(() => []),
+      ]);
+      const all = Array.isArray(appts) ? appts : appts?.data ?? [];
+      setAppointments(all.filter((a) => a.status !== "COMPLETED").slice(0, 3));
+      setPastSessions(all.filter((a) => a.status === "COMPLETED").slice(0, 3));
+      setCounselors(Array.isArray(couns) ? couns : couns?.data ?? []);
+    } catch {}
+    finally { setLoading(false); }
+  };
 
-export default function WellnessCenter() {
+  useEffect(() => { if (user?.id) fetchData(); }, [user?.id]);
+
+  const StatusBadge = ({ status }) => {
+    const map = {
+      CONFIRMED: { color: BASE.success, bg: BASE.success + "15" },
+      PENDING:   { color: BASE.warning, bg: BASE.warning + "15" },
+      CANCELLED: { color: BASE.error,   bg: BASE.error   + "15" },
+    };
+    const s = map[status] || map.PENDING;
+    return (
+      <View style={[styles.badge, { backgroundColor: s.bg }]}>
+        <Text style={[styles.badgeText, { color: s.color }]}>{status}</Text>
+      </View>
+    );
+  };
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} tintColor={theme.primary} />}
+    >
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.title}>Wellness Center</Text>
-        <Text style={styles.subtitle}>
-          Professional support at your fingertips
-        </Text>
+        <Text style={styles.title}>Wellness Centre</Text>
+        <Text style={styles.sub}>Your support, your schedule</Text>
       </View>
 
-      {/* 1. UPCOMING SESSIONS */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Upcoming Sessions</Text>
-        {UPCOMING_SESSIONS.map((item) => (
-          <View key={item.id} style={styles.appointmentCard}>
-            <View style={styles.sessionInfo}>
-              <View style={styles.dateBadge}>
-                <Text style={styles.dateMonth}>{item.date.split(" ")[0]}</Text>
-                <Text style={styles.dateDay}>{item.date.split(" ")[1]}</Text>
-              </View>
-              <View style={styles.textDetails}>
-                <Text style={styles.counselorName}>{item.counselor}</Text>
-                <Text style={styles.sessionTime}>{item.time}</Text>
-              </View>
+      {/* BOOK CTA */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => router.push("/(student)/CounselingBooking")}
+      >
+        <LinearGradient colors={theme.gradient} style={styles.bookCta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <View style={styles.bookCtaLeft}>
+            <View style={styles.bookCtaIcon}>
+              <MaterialCommunityIcons name="calendar-plus" size={24} color="#FFF" />
             </View>
-            <View
-              style={[
-                styles.statusTag,
-                {
-                  backgroundColor:
-                    item.status === "CONFIRMED" ? "#10B98120" : "#F59E0B20",
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusText,
-                  {
-                    color: item.status === "CONFIRMED" ? "#10B981" : "#F59E0B",
-                  },
-                ]}
-              >
-                {item.status}
-              </Text>
+            <View>
+              <Text style={styles.bookCtaTitle}>Book a {supportLabel}</Text>
+              <Text style={styles.bookCtaSub}>Choose time · Select specialist</Text>
             </View>
           </View>
-        ))}
-      </View>
-
-      {/* 2. BOOKING PORTAL SHORTCUT */}
-      <TouchableOpacity style={styles.bookingHero}>
-        <View style={styles.bookingContent}>
-          <View style={styles.iconCircle}>
-            <MaterialCommunityIcons
-              name="calendar-plus"
-              size={24}
-              color="#FFF"
-            />
-          </View>
-          <View>
-            <Text style={styles.bookingTitle}>Book New Session</Text>
-            <Text style={styles.bookingSub}>Select a counselor and time</Text>
-          </View>
-        </View>
-        <MaterialCommunityIcons
-          name="chevron-right"
-          size={24}
-          color="#475569"
-        />
+          <MaterialCommunityIcons name="arrow-right" size={20} color="rgba(255,255,255,0.8)" />
+        </LinearGradient>
       </TouchableOpacity>
 
-      {/* 3. COUNSELOR DIRECTORY */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Our Counselors</Text>
+      {/* UPCOMING SESSIONS */}
+      {appointments.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Upcoming Sessions</Text>
+          {appointments.map((appt) => {
+            const date = new Date(appt.scheduledAt || appt.date);
+            return (
+              <View key={appt.id} style={styles.apptCard}>
+                <View style={[styles.datePill, { backgroundColor: theme.primary + "18", borderColor: theme.primary + "40" }]}>
+                  <Text style={[styles.dateMonth, { color: theme.primary }]}>
+                    {date.toLocaleDateString([], { month: "short" }).toUpperCase()}
+                  </Text>
+                  <Text style={[styles.dateDay, { color: theme.secondary }]}>
+                    {date.getDate()}
+                  </Text>
+                </View>
+                <View style={styles.apptInfo}>
+                  <Text style={styles.apptName}>{appt.counselorName || appt.counselor?.firstName || supportLabel}</Text>
+                  <Text style={styles.apptTime}>
+                    {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                </View>
+                <StatusBadge status={appt.status} />
+              </View>
+            );
+          })}
+        </>
+      )}
+
+      {/* CARE TEAM */}
+      <Text style={styles.sectionTitle}>Our {supportLabel}s</Text>
+      {counselors.length === 0 ? (
+        <Text style={styles.emptyText}>No {supportLabel.toLowerCase()}s listed yet.</Text>
+      ) : (
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={COUNSELORS}
+          data={counselors}
+          keyExtractor={(c) => c.id}
+          contentContainerStyle={{ gap: 12 }}
           renderItem={({ item }) => (
             <View style={styles.counselorCard}>
-              <View style={styles.avatarPlaceholder}>
-                <MaterialCommunityIcons
-                  name="account-tie"
-                  size={40}
-                  color="#818CF8"
-                />
+              <View style={[styles.counselorAvatar, { backgroundColor: theme.primary + "18" }]}>
+                <MaterialCommunityIcons name="account-tie" size={32} color={theme.primary} />
               </View>
-              <Text style={styles.cName}>{item.name}</Text>
-              <Text style={styles.cSpecialty}>{item.specialty}</Text>
-              <View style={styles.availabilityRow}>
-                <View style={styles.greenDot} />
-                <Text style={styles.availabilityText}>
-                  Next: {item.available}
-                </Text>
+              <Text style={styles.counselorName} numberOfLines={1}>
+                {item.firstName} {item.lastName}
+              </Text>
+              <Text style={styles.counselorRole}>{supportLabel}</Text>
+              <View style={styles.availRow}>
+                <View style={[styles.avDot, { backgroundColor: BASE.success }]} />
+                <Text style={[styles.avText, { color: BASE.success }]}>Available</Text>
               </View>
+              <TouchableOpacity
+                style={[styles.bookBtn, { backgroundColor: theme.primary + "15", borderColor: theme.primary + "40" }]}
+                onPress={() => router.push("/(student)/CounselingBooking")}
+              >
+                <Text style={[styles.bookBtnText, { color: theme.primary }]}>Book</Text>
+              </TouchableOpacity>
             </View>
           )}
-          keyExtractor={(item) => item.id}
         />
-      </View>
+      )}
 
-      {/* 4. PAST SUMMARIES */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Past Session Notes</Text>
-        <TouchableOpacity style={styles.summaryItem}>
-          <MaterialCommunityIcons
-            name="file-document-outline"
-            size={24}
-            color="#64748B"
-          />
-          <View style={styles.summaryText}>
-            <Text style={styles.summaryTitle}>General Wellbeing Session</Text>
-            <Text style={styles.summaryDate}>Completed on Feb 10, 2026</Text>
-          </View>
-          <MaterialCommunityIcons name="download" size={20} color="#818CF8" />
-        </TouchableOpacity>
-      </View>
+      {/* PAST SESSIONS */}
+      {pastSessions.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Session History</Text>
+          {pastSessions.map((s) => (
+            <View key={s.id} style={styles.pastCard}>
+              <View style={[styles.pastIcon, { backgroundColor: BASE.success + "15" }]}>
+                <MaterialCommunityIcons name="file-document-check-outline" size={20} color={BASE.success} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={styles.pastTitle}>{s.type || "Wellness Session"}</Text>
+                <Text style={styles.pastDate}>
+                  {new Date(s.scheduledAt || s.date).toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}
+                </Text>
+              </View>
+              <MaterialCommunityIcons name="download-outline" size={20} color={BASE.textMuted} />
+            </View>
+          ))}
+        </>
+      )}
 
       <View style={{ height: 40 }} />
+      <Toast />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#020617", paddingHorizontal: 20 },
-  header: { marginTop: 60, marginBottom: 25 },
-  title: { color: "#F8FAFC", fontSize: 28, fontWeight: "800" },
-  subtitle: { color: "#64748B", fontSize: 16, marginTop: 4 },
+  container:    { flex: 1, backgroundColor: BASE.bg, paddingHorizontal: 20 },
+  header:       { marginTop: 60, marginBottom: 24 },
+  title:        { color: BASE.textPrimary, fontSize: 28, fontWeight: "800" },
+  sub:          { color: BASE.textMuted, fontSize: 15, marginTop: 4 },
 
-  section: { marginBottom: 30 },
-  sectionTitle: {
-    color: "#F8FAFC",
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 15,
-  },
+  bookCta:      { borderRadius: 24, padding: 22, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 28 },
+  bookCtaLeft:  { flexDirection: "row", alignItems: "center", gap: 16 },
+  bookCtaIcon:  { width: 46, height: 46, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
+  bookCtaTitle: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  bookCtaSub:   { color: "rgba(255,255,255,0.72)", fontSize: 12, marginTop: 2 },
 
-  appointmentCard: {
-    backgroundColor: "#0F172A",
-    borderRadius: 24,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-  },
-  sessionInfo: { flexDirection: "row", alignItems: "center" },
-  dateBadge: {
-    backgroundColor: "#1E293B",
-    padding: 10,
-    borderRadius: 16,
-    alignItems: "center",
-    minWidth: 55,
-  },
-  dateMonth: {
-    color: "#818CF8",
-    fontSize: 10,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-  },
-  dateDay: { color: "#F8FAFC", fontSize: 18, fontWeight: "bold" },
-  textDetails: { marginLeft: 15 },
-  counselorName: { color: "#F8FAFC", fontSize: 15, fontWeight: "600" },
-  sessionTime: { color: "#64748B", fontSize: 13, marginTop: 2 },
-  statusTag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  statusText: { fontSize: 10, fontWeight: "bold" },
+  sectionTitle: { color: BASE.textPrimary, fontSize: 17, fontWeight: "700", marginBottom: 14, marginTop: 4 },
+  emptyText:    { color: BASE.textMuted, fontSize: 13, marginBottom: 20 },
 
-  bookingHero: {
-    backgroundColor: "#0F172A",
-    padding: 20,
-    borderRadius: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 30,
-    borderStyle: "dashed",
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  bookingContent: { flexDirection: "row", alignItems: "center" },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#818CF8",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 15,
-  },
-  bookingTitle: { color: "#F8FAFC", fontSize: 16, fontWeight: "bold" },
-  bookingSub: { color: "#64748B", fontSize: 12, marginTop: 2 },
+  apptCard:  { backgroundColor: BASE.surface, borderRadius: 20, padding: 16, flexDirection: "row", alignItems: "center", marginBottom: 10, borderWidth: 1, borderColor: BASE.border },
+  datePill:  { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, alignItems: "center", minWidth: 52, borderWidth: 1, marginRight: 14 },
+  dateMonth: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  dateDay:   { fontSize: 20, fontWeight: "800" },
+  apptInfo:  { flex: 1 },
+  apptName:  { color: BASE.textPrimary, fontSize: 14, fontWeight: "600" },
+  apptTime:  { color: BASE.textSecondary, fontSize: 12, marginTop: 3 },
+  badge:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  badgeText: { fontSize: 10, fontWeight: "800" },
 
-  counselorCard: {
-    backgroundColor: "#0F172A",
-    width: 160,
-    padding: 20,
-    borderRadius: 24,
-    marginRight: 15,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#1E293B",
-  },
-  avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#1E293B",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  cName: {
-    color: "#F8FAFC",
-    fontSize: 14,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  cSpecialty: {
-    color: "#64748B",
-    fontSize: 11,
-    marginTop: 4,
-    textAlign: "center",
-  },
-  availabilityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 12,
-  },
-  greenDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#10B981",
-    marginRight: 6,
-  },
-  availabilityText: { color: "#10B981", fontSize: 10, fontWeight: "600" },
+  counselorCard: { backgroundColor: BASE.surface, width: 155, padding: 18, borderRadius: 22, alignItems: "center", borderWidth: 1, borderColor: BASE.border },
+  counselorAvatar: { width: 56, height: 56, borderRadius: 18, justifyContent: "center", alignItems: "center", marginBottom: 10 },
+  counselorName: { color: BASE.textPrimary, fontSize: 14, fontWeight: "700", textAlign: "center" },
+  counselorRole: { color: BASE.textSecondary, fontSize: 11, marginTop: 2 },
+  availRow:      { flexDirection: "row", alignItems: "center", marginTop: 10 },
+  avDot:         { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
+  avText:        { fontSize: 11, fontWeight: "600" },
+  bookBtn:       { marginTop: 12, paddingHorizontal: 22, paddingVertical: 8, borderRadius: 12, borderWidth: 1 },
+  bookBtnText:   { fontSize: 12, fontWeight: "700" },
 
-  summaryItem: {
-    backgroundColor: "#0F172A",
-    padding: 16,
-    borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  summaryText: { flex: 1, marginLeft: 15 },
-  summaryTitle: { color: "#F8FAFC", fontSize: 14, fontWeight: "600" },
-  summaryDate: { color: "#475569", fontSize: 12, marginTop: 2 },
+  pastCard: { backgroundColor: BASE.surface, borderRadius: 18, padding: 16, flexDirection: "row", alignItems: "center", marginBottom: 10, borderWidth: 1, borderColor: BASE.border },
+  pastIcon: { width: 42, height: 42, borderRadius: 13, justifyContent: "center", alignItems: "center" },
+  pastTitle:{ color: BASE.textPrimary, fontSize: 14, fontWeight: "600" },
+  pastDate: { color: BASE.textMuted, fontSize: 12, marginTop: 3 },
 });

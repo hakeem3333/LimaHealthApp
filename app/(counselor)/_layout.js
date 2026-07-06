@@ -3,9 +3,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import { Redirect } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { View, ActivityIndicator } from "react-native";
+import { BASE } from "../../utils/orgTheme";
 
 export default function CounselorLayout() {
-  const { user, isCounselor, loading } = useAuth();
+  const { user, isCounselor, loading, theme } = useAuth();
 
   // 1. Loading State
   if (loading) {
@@ -15,10 +16,10 @@ export default function CounselorLayout() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#020617",
+          backgroundColor: BASE.bg,
         }}
       >
-        <ActivityIndicator size="large" color="#818CF8" />
+        <ActivityIndicator size="large" color={theme?.primary ?? BASE.success} />
       </View>
     );
   }
@@ -33,54 +34,44 @@ export default function CounselorLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#0F172A",
+          backgroundColor: BASE.surface,
           borderTopWidth: 1,
-          borderTopColor: "#1E293B",
+          borderTopColor: BASE.border,
           height: 60,
           paddingBottom: 8,
         },
-        tabBarActiveTintColor: "#818CF8",
-        tabBarInactiveTintColor: "#64748B",
+        tabBarActiveTintColor:   theme?.primary ?? BASE.success,
+        tabBarInactiveTintColor: BASE.textMuted,
       }}
     >
-      {/* 3. MAIN DASHBOARD TAB */}
+      {/* Main dashboard tab */}
       <Tabs.Screen
         name="dashboard"
         options={{
           title: "Overview",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="view-dashboard"
-              size={size}
-              color={color}
-            />
+            <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
           ),
         }}
       />
 
-      {/* 4. SESSIONS / INTAKE TAB */}
+      {/* Sessions / intake tab */}
       <Tabs.Screen
         name="sessions"
         options={{
           title: "Sessions",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="calendar-clock"
-              size={size}
-              color={color}
-            />
+            <MaterialCommunityIcons name="calendar-clock" size={size} color={color} />
           ),
         }}
       />
 
-      {/* 5. HIDDEN DYNAMIC ROUTE (Student Deep Dive) 
-          We hide this from the Tab Bar because it's triggered from the Dashboard
-      */}
+      {/* Hidden dynamic route — member deep-dive, triggered from dashboard */}
       <Tabs.Screen
         name="[studentId]"
         options={{
-          href: null, // This hides the tab from the bar
-          tabBarStyle: { display: "none" }, // Hides bar when viewing a profile
+          href: null,
+          tabBarStyle: { display: "none" },
         }}
       />
     </Tabs>

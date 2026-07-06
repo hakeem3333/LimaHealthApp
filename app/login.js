@@ -1,472 +1,257 @@
-// import React, { useState } from "react";
-// import {
-//   View,
-//   Text,
-//   TextInput,
-//   TouchableOpacity,
-//   StyleSheet,
-//   SafeAreaView,
-//   KeyboardAvoidingView,
-//   Platform,
-// } from "react-native";
-// import { useRouter, useLocalSearchParams, useNavigation } from "expo-router";
-// import { useAuth } from "../contexts/AuthContext";
-// import { Ionicons } from "@expo/vector-icons";
-// // 1. Import Toast
-// import Toast from "react-native-toast-message";
-
-// const LoginScreen = () => {
-//   const router = useRouter();
-//   const navigation = useNavigation();
-//   const { role } = useLocalSearchParams();
-//   const { login } = useAuth();
-
-//   const [email, setEmail] = useState("");
-//   const [password, setPassword] = useState("");
-//   const [loading, setLoading] = useState(false);
-
-//   const canGoBack = navigation.canGoBack();
-
-//   const handleLogin = async () => {
-//     if (!email || !password) {
-//       // 2. Use Toast for validation
-//       Toast.show({
-//         type: "error",
-//         text1: "Required Fields",
-//         text2: "Please fill in all fields 👋",
-//       });
-//       return;
-//     }
-
-//     setLoading(true);
-//     try {
-//       await login(email, password);
-
-//       Toast.show({
-//         type: "success",
-//         text1: "Welcome Back!",
-//         text2: "Login successful",
-//       });
-
-//       setTimeout(() => {
-//         if (role === "counselor") {
-//           router.replace("/(counselor)/dashboard");
-//         } else {
-//           router.replace("/(student)/home");
-//         }
-//       }, 500);
-//     } catch (error) {
-//       // 3. Use Toast for actual errors
-//       Toast.show({
-//         type: "error",
-//         text1: "Login Failed",
-//         text2: error.message || "Invalid credentials",
-//       });
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <SafeAreaView style={styles.container}>
-//       <KeyboardAvoidingView
-//         behavior={Platform.OS === "ios" ? "padding" : "height"}
-//         style={styles.inner}
-//       >
-//         <View style={styles.header}>
-//           {canGoBack ? (
-//             <TouchableOpacity
-//               onPress={() => router.back()}
-//               style={styles.backButton}
-//             >
-//               <Ionicons name="arrow-back" size={28} color="#6D28D9" />
-//             </TouchableOpacity>
-//           ) : (
-//             <View style={styles.backButtonPlaceholder} />
-//           )}
-
-//           <Text style={styles.title}>
-//             {role === "counselor" ? "Counselor" : "Student"} Login
-//           </Text>
-//           <Text style={styles.subtitle}>Welcome back to LimaHealth</Text>
-//         </View>
-
-//         <View style={styles.form}>
-//           <Text style={styles.inputLabel}>School Email</Text>
-//           <TextInput
-//             style={styles.input}
-//             placeholder="name@school.edu"
-//             placeholderTextColor="#A78BFA"
-//             keyboardType="email-address"
-//             autoCapitalize="none"
-//             value={email}
-//             onChangeText={setEmail}
-//           />
-
-//           <Text style={styles.inputLabel}>Password</Text>
-//           <TextInput
-//             style={styles.input}
-//             placeholder="••••••••"
-//             placeholderTextColor="#A78BFA"
-//             secureTextEntry
-//             value={password}
-//             onChangeText={setPassword}
-//           />
-
-//           <TouchableOpacity
-//             style={[styles.button, loading && { opacity: 0.7 }]}
-//             onPress={handleLogin}
-//             disabled={loading}
-//           >
-//             <Text style={styles.buttonText}>
-//               {loading ? "Signing in..." : "Sign In"}
-//             </Text>
-//           </TouchableOpacity>
-//         </View>
-
-//         <View style={styles.footer}>
-//           <Text style={styles.footerText}>
-//             Forgot your password? Please contact your school's IT department.
-//           </Text>
-//         </View>
-//       </KeyboardAvoidingView>
-
-//       {/* 4. IMPORTANT: Place the Toast component at the very bottom of the root view */}
-//       <Toast />
-//     </SafeAreaView>
-//   );
-// };
-
-// export default LoginScreen;
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: "#FAF5FF", // Light purple tint background
-//   },
-//   inner: {
-//     flex: 1,
-//     paddingHorizontal: 28,
-//     justifyContent: "space-between",
-//   },
-//   header: {
-//     marginTop: 20,
-//   },
-//   backButton: {
-//     marginBottom: 20,
-//     width: 44,
-//     height: 44,
-//     borderRadius: 22,
-//     backgroundColor: "#EDE9FE", // Soft purple circle
-//     justifyContent: "center",
-//     alignItems: "center",
-//   },
-//   backButtonPlaceholder: {
-//     height: 64,
-//   },
-//   title: {
-//     fontSize: 32,
-//     fontWeight: "800",
-//     color: "#2E1065", // Deep purple
-//   },
-//   subtitle: {
-//     fontSize: 16,
-//     color: "#7C3AED",
-//     marginTop: 8,
-//   },
-//   form: {
-//     marginTop: -40,
-//   },
-//   inputLabel: {
-//     fontSize: 14,
-//     fontWeight: "700",
-//     color: "#4C1D95",
-//     marginBottom: 8,
-//     marginLeft: 4,
-//   },
-//   input: {
-//     width: "100%",
-//     height: 56,
-//     backgroundColor: "#FFFFFF",
-//     borderRadius: 16,
-//     paddingHorizontal: 16,
-//     fontSize: 16,
-//     color: "#1A1C1E",
-//     marginBottom: 20,
-//     borderWidth: 1,
-//     borderColor: "#DDD6FE",
-//   },
-//   button: {
-//     width: "100%",
-//     height: 56,
-//     backgroundColor: "#6D28D9", // Primary Purple
-//     borderRadius: 16,
-//     justifyContent: "center",
-//     alignItems: "center",
-//     marginTop: 10,
-//     shadowColor: "#6D28D9",
-//     shadowOffset: { width: 0, height: 4 },
-//     shadowOpacity: 0.3,
-//     shadowRadius: 10,
-//     elevation: 5,
-//   },
-//   buttonText: {
-//     color: "#FFF",
-//     fontWeight: "700",
-//     fontSize: 18,
-//   },
-//   footer: {
-//     marginBottom: 40,
-//   },
-//   footerText: {
-//     textAlign: "center",
-//     color: "#A78BFA",
-//     fontSize: 13,
-//     lineHeight: 20,
-//   },
-// });
-
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  SafeAreaView, KeyboardAvoidingView, Platform,
+  ActivityIndicator, StatusBar,
 } from "react-native";
 import { useRouter, useLocalSearchParams, useNavigation } from "expo-router";
 import { useAuth } from "../contexts/AuthContext";
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 
-const LoginScreen = () => {
-  const router = useRouter();
+// ── Light-mode design tokens ─────────────────────────────────────────────────
+const C = {
+  bg:          "#F4F7FC",
+  surface:     "#FFFFFF",
+  border:      "#E2E8F0",
+  borderFocus: "#CBD5E1",
+  teal:        "#0CAF87",   // Member login accent
+  tealLight:   "#EBF9F5",
+  tealGlow:    "rgba(12,175,135,0.15)",
+  purple:      "#6C5CE7",   // Counselor login accent
+  purpleLight: "#E9E6FE",
+  purpleGlow:  "rgba(108,92,231,0.12)",
+  textPrimary: "#1B2A3B",
+  textSecond:  "#5F6B7A",
+  textMuted:   "#94A3B8",
+};
+
+export default function LoginScreen() {
+  const router     = useRouter();
   const navigation = useNavigation();
-  const { role: paramRole } = useLocalSearchParams(); // From URL/State
-  const { login } = useAuth();
+  const { role }   = useLocalSearchParams();
+  const { login }  = useAuth();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [email,      setEmail]      = useState("");
+  const [password,   setPassword]   = useState("");
+  const [showPwd,    setShowPwd]    = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [emailFocus, setEmailFocus] = useState(false);
+  const [pwdFocus,   setPwdFocus]   = useState(false);
 
-  const canGoBack = navigation.canGoBack();
+  const isCounselor = role === "counselor";
+
+  // Color scheme switches based on who is logging in
+  const accent      = isCounselor ? C.purple : C.teal;
+  const accentLight = isCounselor ? C.purpleLight : C.tealLight;
+  const accentGlow  = isCounselor ? C.purpleGlow  : C.tealGlow;
+  const blobColor   = isCounselor ? "rgba(108,92,231,0.08)" : "rgba(12,175,135,0.08)";
 
   const handleLogin = async () => {
-    // 1. Validation
     if (!email || !password) {
-      Toast.show({
-        type: "error",
-        text1: "Required Fields",
-        text2: "Please fill in all fields 👋",
-      });
+      Toast.show({ type: "error", text1: "Required", text2: "Please fill in all fields" });
       return;
     }
 
     setLoading(true);
     try {
-      // 2. AuthContext login (now returns user object with role)
       const user = await login(email, password);
-
-      Toast.show({
-        type: "success",
-        text1: "Welcome Back!",
-        text2: `Logged in as ${user.firstName}`,
-      });
-
-      // 3. Security: Redirect based on DB Role, not URL params
+      Toast.show({ type: "success", text1: `Welcome, ${user.firstName}!`, text2: "Signed in successfully" });
       setTimeout(() => {
-        if (user.role === "COUNSELOR") {
-          router.replace("/(counselor)/dashboard");
-        } else {
-          router.replace("/(student)/home");
-        }
-      }, 500);
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Login Failed",
-        text2: error.message || "Invalid credentials",
-      });
+        if (user.role === "COUNSELOR") router.replace("/(counselor)/dashboard");
+        else router.replace("/(student)/home");
+      }, 400);
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Login Failed", text2: err.message || "Invalid credentials" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.inner}
-      >
-        {/* HEADER SECTION */}
-        <View style={styles.header}>
-          {canGoBack ? (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.backButton}
-            >
-              <Ionicons name="arrow-back" size={24} color="#6D28D9" />
+    <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+
+      {/* Soft background blob */}
+      <View style={[styles.topGlow, { backgroundColor: blobColor }]} />
+
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.kav}
+        >
+          {/* Back button */}
+          {navigation.canGoBack() && (
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+              <MaterialCommunityIcons name="arrow-left" size={22} color={C.textSecond} />
             </TouchableOpacity>
-          ) : (
-            <View style={styles.backButtonPlaceholder} />
           )}
 
-          <Text style={styles.title}>
-            {paramRole === "counselor" ? "Counselor" : "Student"} Login
-          </Text>
-          <Text style={styles.subtitle}>Welcome back to LimaHealth</Text>
-        </View>
-
-        {/* FORM SECTION */}
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>School Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="name@school.edu"
-              placeholderTextColor="#A78BFA"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={[styles.roleChip, { backgroundColor: accentLight }]}>
+              <MaterialCommunityIcons
+                name={isCounselor ? "stethoscope" : "account-heart-outline"}
+                size={14}
+                color={accent}
+              />
+              <Text style={[styles.roleChipText, { color: accent }]}>
+                {isCounselor ? "Care Provider" : "Member"}
+              </Text>
+            </View>
+            <Text style={styles.title}>Welcome{"\n"}back</Text>
+            <Text style={styles.sub}>Sign in to your LimaHealth account</Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              placeholderTextColor="#A78BFA"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
+          {/* Form */}
+          <View style={styles.form}>
+            {/* Email */}
+            <View style={[
+              styles.inputWrap,
+              emailFocus && { borderColor: accent, backgroundColor: accentGlow },
+            ]}>
+              <MaterialCommunityIcons
+                name="email-outline" size={20}
+                color={emailFocus ? accent : C.textMuted}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Email address"
+                placeholderTextColor={C.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setEmailFocus(true)}
+                onBlur={() => setEmailFocus(false)}
+              />
+            </View>
+
+            {/* Password */}
+            <View style={[
+              styles.inputWrap,
+              pwdFocus && { borderColor: accent, backgroundColor: accentGlow },
+            ]}>
+              <MaterialCommunityIcons
+                name="lock-outline" size={20}
+                color={pwdFocus ? accent : C.textMuted}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Password"
+                placeholderTextColor={C.textMuted}
+                secureTextEntry={!showPwd}
+                value={password}
+                onChangeText={setPassword}
+                onFocus={() => setPwdFocus(true)}
+                onBlur={() => setPwdFocus(false)}
+              />
+              <TouchableOpacity onPress={() => setShowPwd(!showPwd)} style={styles.eyeBtn}>
+                <MaterialCommunityIcons
+                  name={showPwd ? "eye-off-outline" : "eye-outline"}
+                  size={20} color={C.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.forgotWrap}>
+              <Text style={[styles.forgotText, { color: accent }]}>Forgot password?</Text>
+            </TouchableOpacity>
+
+            {/* Sign In button */}
+            <TouchableOpacity
+              style={[
+                styles.btn,
+                { backgroundColor: accent, shadowColor: accent },
+                loading && styles.btnDisabled,
+              ]}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading
+                ? <ActivityIndicator color="#FFF" />
+                : <Text style={styles.btnText}>Sign In</Text>
+              }
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <MaterialCommunityIcons name="shield-lock-outline" size={13} color={C.textMuted} />
+            <Text style={styles.footerText}>  Secured with end-to-end encryption</Text>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
 
-        {/* FOOTER SECTION */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Forgot your password? Please contact your school's IT department.
-          </Text>
-        </View>
-      </KeyboardAvoidingView>
-
-      {/* GLOBAL TOAST COMPONENT */}
       <Toast />
-    </SafeAreaView>
+    </View>
   );
-};
-
-export default LoginScreen;
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FAF5FF",
+  root: { flex: 1, backgroundColor: C.bg },
+
+  topGlow: {
+    position: "absolute", top: -100, right: -60,
+    width: 260, height: 260, borderRadius: 130,
   },
-  inner: {
-    flex: 1,
-    paddingHorizontal: 28,
+
+  kav: { flex: 1, paddingHorizontal: 26 },
+
+  backBtn: {
+    marginTop: Platform.OS === "android" ? 50 : 10,
+    width: 42, height: 42, borderRadius: 14,
+    backgroundColor: C.surface,
+    borderWidth: 1, borderColor: C.border,
+    justifyContent: "center", alignItems: "center",
+    alignSelf: "flex-start",
   },
-  header: {
-    marginTop: Platform.OS === "android" ? 40 : 20,
-    marginBottom: 40,
+
+  header: { marginTop: 32, marginBottom: 36 },
+  roleChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, alignSelf: "flex-start", marginBottom: 18,
   },
-  backButton: {
-    marginBottom: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#EDE9FE",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backButtonPlaceholder: {
-    height: 64,
-  },
+  roleChipText: { fontSize: 12, fontWeight: "700" },
   title: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#2E1065",
+    fontSize: 38, fontWeight: "800", color: C.textPrimary,
+    lineHeight: 46, letterSpacing: -0.8,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#7C3AED",
-    marginTop: 8,
+  sub: { fontSize: 15, color: C.textSecond, marginTop: 8 },
+
+  form: { gap: 14 },
+
+  inputWrap: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.surface,
+    borderRadius: 18, paddingHorizontal: 16,
+    height: 56, borderWidth: 1, borderColor: C.border,
   },
-  form: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#4C1D95",
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  input: {
-    width: "100%",
+  inputIcon: { marginRight: 10 },
+  input: { flex: 1, color: C.textPrimary, fontSize: 15 },
+  eyeBtn: { padding: 4 },
+
+  forgotWrap: { alignSelf: "flex-end", marginTop: -4 },
+  forgotText: { fontSize: 13, fontWeight: "600" },
+
+  btn: {
     height: 56,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: "#1A1C1E",
-    borderWidth: 1,
-    borderColor: "#DDD6FE",
+    borderRadius: 18, justifyContent: "center", alignItems: "center",
+    marginTop: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
   },
-  button: {
-    width: "100%",
-    height: 56,
-    backgroundColor: "#6D28D9",
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 10,
-    shadowColor: "#6D28D9",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-    backgroundColor: "#A78BFA",
-  },
-  buttonText: {
-    color: "#FFF",
-    fontWeight: "700",
-    fontSize: 18,
-  },
+  btnDisabled: { opacity: 0.6 },
+  btnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+
   footer: {
-    paddingVertical: 30,
+    flexDirection: "row", justifyContent: "center", alignItems: "center",
+    marginTop: "auto", paddingVertical: 28,
   },
-  footerText: {
-    textAlign: "center",
-    color: "#A78BFA",
-    fontSize: 13,
-    lineHeight: 20,
-  },
+  footerText: { color: C.textMuted, fontSize: 12 },
 });

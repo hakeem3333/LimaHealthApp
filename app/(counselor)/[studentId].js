@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,104 +6,152 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 
-const { width } = Dimensions.get("window");
+import { apiFetch } from "../../api/client";
+import { useAuth } from "../../contexts/AuthContext";
 
-export default function StudentDeepDive({ route, navigation }) {
-  // In a real app, you'd pull this ID from the route params
+const SEVERITY_STYLE = {
+  CRITICAL: { color: "#EF4444", label: "CRITICAL" },
+  HIGH:     { color: "#F59E0B", label: "HIGH" },
+  MODERATE: { color: "#818CF8", label: "MODERATE" },
+  LOW:      { color: "#10B981", label: "LOW" },
+};
+
+export default function StudentDeepDive() {
+  const { studentId } = useLocalSearchParams();
+  const router = useRouter();
+  const { memberLabel } = useAuth();
+
+  const [student, setStudent]     = useState(null);
+  const [loading, setLoading]     = useState(true);
   const [counselorNote, setCounselorNote] = useState("");
-  const [activeTab, setActiveTab] = useState("insights");
+
+  const fetchStudent = useCallback(async () => {
+    if (!studentId) return;
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/counselor/students/${studentId}`);
+      setStudent(res.data);
+    } catch (err) {
+      console.error("Student details fetch error:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [studentId]);
+
+  useFocusEffect(useCallback(() => { fetchStudent(); }, [fetchStudent]));
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!student) {
+    return (
+      <SafeAreaView style={[styles.container, styles.center]}>
+        <Text style={styles.emptyText}>Could not load this {memberLabel.toLowerCase()}'s profile.</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <MaterialCommunityIcons name="chevron-left" size={20} color="#F8FAFC" />
+          <Text style={styles.backBtnText}>Go back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const latestAlert = student.alertsAsStudent?.[0] ?? null;
+  const severity = SEVERITY_STYLE[latestAlert?.severity] ?? null;
+
+  const avgHeartRate = student.biometricLogs?.length
+    ? Math.round(student.biometricLogs.reduce((s, b) => s + (b.heartRate || 0), 0) / student.biometricLogs.length)
+    : null;
+  const avgStress = student.biometricLogs?.length
+    ? Math.round(student.biometricLogs.reduce((s, b) => s + (b.stressLevelScore || 0), 0) / student.biometricLogs.length)
+    : null;
 
   return (
     <SafeAreaView style={styles.container}>
       {/* HEADER: Back Button & Student Identity */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-        >
-          <MaterialCommunityIcons
-            name="chevron-left"
-            size={28}
-            color="#F8FAFC"
-          />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backCircle}>
+          <MaterialCommunityIcons name="chevron-left" size={28} color="#F8FAFC" />
         </TouchableOpacity>
         <View style={styles.studentInfo}>
-          <Text style={styles.studentName}>Marcus Johnson</Text>
-          <Text style={styles.studentId}>Student ID: #88293</Text>
+          <Text style={styles.studentName}>{student.firstName} {student.lastName}</Text>
+          <Text style={styles.studentId}>{memberLabel} · {student.email}</Text>
         </View>
-        <TouchableOpacity style={styles.statusBadge}>
-          <View style={styles.criticalDot} />
-          <Text style={styles.statusText}>CRITICAL</Text>
-        </TouchableOpacity>
+        {severity && (
+          <View style={[styles.statusBadge, { backgroundColor: severity.color + "1A", borderColor: severity.color + "4D" }]}>
+            <View style={[styles.criticalDot, { backgroundColor: severity.color }]} />
+            <Text style={[styles.statusText, { color: severity.color }]}>{severity.label}</Text>
+          </View>
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* 1. BIOMETRIC OVERLAY (Visual Heatmap) */}
+        {/* 1. BIOMETRIC SUMMARY */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Correlation Analytics</Text>
-          <View style={styles.chartPlaceholder}>
-            {/* Mock Chart UI */}
-            <View style={styles.chartHeader}>
-              <View style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, { backgroundColor: "#EF4444" }]}
-                />
-                <Text style={styles.legendText}>Avg Heart Rate (BPM)</Text>
+          <Text style={styles.sectionTitle}>Biometric Summary</Text>
+          {student.biometricLogs?.length ? (
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <MaterialCommunityIcons name="heart-pulse" size={20} color="#EF4444" />
+                <Text style={styles.statValue}>{avgHeartRate ?? "--"}</Text>
+                <Text style={styles.statLabel}>avg bpm</Text>
               </View>
-              <View style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, { backgroundColor: "#818CF8" }]}
-                />
-                <Text style={styles.legendText}>Mood Logs</Text>
+              <View style={styles.statCard}>
+                <MaterialCommunityIcons name="lightning-bolt" size={20} color="#F59E0B" />
+                <Text style={styles.statValue}>{avgStress ?? "--"}</Text>
+                <Text style={styles.statLabel}>avg stress</Text>
+              </View>
+              <View style={styles.statCard}>
+                <MaterialCommunityIcons name="clock-outline" size={20} color="#818CF8" />
+                <Text style={styles.statValue}>{student.biometricLogs.length}</Text>
+                <Text style={styles.statLabel}>readings</Text>
               </View>
             </View>
+          ) : (
+            <Text style={styles.emptySection}>No biometric readings yet.</Text>
+          )}
 
-            {/* Simple Graphic Representation of Overlay */}
-            <View style={styles.visualGraph}>
-              <MaterialCommunityIcons
-                name="chart-bell-curve-cumulative"
-                size={120}
-                color="rgba(129, 140, 248, 0.3)"
-              />
-              <Text style={styles.chartNote}>
-                [ Interactive HRV vs Mood Chart ]
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.insightNote}>
-            <MaterialCommunityIcons
-              name="lightbulb-on"
-              size={14}
-              color="#F59E0B"
-            />{" "}
-            Significant HR spike (112bpm) detected during "Anxious" mood log at
-            2:15 PM today.
-          </Text>
+          {latestAlert && (
+            <Text style={[styles.insightNote, { color: severity?.color ?? "#F59E0B" }]}>
+              <MaterialCommunityIcons name="lightbulb-on" size={14} color={severity?.color ?? "#F59E0B"} />{" "}
+              {latestAlert.message ?? latestAlert.alertType.replace(/_/g, " ")}
+            </Text>
+          )}
         </View>
 
         {/* 2. SHARED JOURNAL ACCESS */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Shared Reflections</Text>
-            <MaterialCommunityIcons
-              name="lock-open-variant-outline"
-              size={18}
-              color="#10B981"
-            />
+            <MaterialCommunityIcons name="lock-open-variant-outline" size={18} color="#10B981" />
           </View>
 
-          <View style={styles.journalCard}>
-            <Text style={styles.journalDate}>Today, 10:45 AM</Text>
-            <Text style={styles.journalText}>
-              "The pressure from the math project is getting to be too much. I
-              feel like I'm falling behind even when I study until 2 AM."
-            </Text>
-          </View>
+          {student.moodLogs?.length ? (
+            student.moodLogs.slice(0, 5).map((log) => (
+              <View key={log.id} style={styles.journalCard}>
+                <View style={styles.journalTop}>
+                  <Text style={styles.journalMood}>{log.moodEmoji}</Text>
+                  <Text style={styles.journalDate}>
+                    {new Date(log.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                </View>
+                {log.notes && <Text style={styles.journalText}>"{log.notes}"</Text>}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.emptySection}>No shared reflections yet.</Text>
+          )}
         </View>
 
         {/* 3. PRIVATE COUNSELOR NOTES */}
@@ -111,14 +159,8 @@ export default function StudentDeepDive({ route, navigation }) {
           <Text style={styles.sectionTitle}>Clinical Observations</Text>
           <View style={styles.notesContainer}>
             <View style={styles.privateBadge}>
-              <MaterialCommunityIcons
-                name="eye-off"
-                size={12}
-                color="#94A3B8"
-              />
-              <Text style={styles.privateText}>
-                PRIVATE: NOT VISIBLE TO STUDENT
-              </Text>
+              <MaterialCommunityIcons name="eye-off" size={12} color="#94A3B8" />
+              <Text style={styles.privateText}>PRIVATE: NOT VISIBLE TO {memberLabel.toUpperCase()}</Text>
             </View>
             <TextInput
               style={styles.notesInput}
@@ -128,8 +170,8 @@ export default function StudentDeepDive({ route, navigation }) {
               value={counselorNote}
               onChangeText={setCounselorNote}
             />
-            <TouchableOpacity style={styles.saveBtn}>
-              <Text style={styles.saveBtnText}>Save Clinical Note</Text>
+            <TouchableOpacity style={styles.saveBtn} disabled>
+              <Text style={styles.saveBtnText}>Save Clinical Note (coming soon)</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -142,33 +184,35 @@ export default function StudentDeepDive({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#020617", paddingHorizontal: 20 },
+  center: { justifyContent: "center", alignItems: "center" },
+  emptyText: { color: "#94A3B8", fontSize: 14, marginBottom: 16 },
+  backBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#1E293B", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  backBtnText: { color: "#F8FAFC", fontWeight: "600" },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginVertical: 20,
   },
-  backBtn: { backgroundColor: "#1E293B", padding: 8, borderRadius: 12 },
+  backCircle: { backgroundColor: "#1E293B", padding: 8, borderRadius: 12 },
   studentInfo: { flex: 1, marginLeft: 15 },
   studentName: { color: "#F8FAFC", fontSize: 20, fontWeight: "bold" },
   studentId: { color: "#64748B", fontSize: 12 },
   statusBadge: {
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
     flexDirection: "row",
     alignItems: "center",
     padding: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.3)",
   },
   criticalDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#EF4444",
     marginRight: 6,
   },
-  statusText: { color: "#EF4444", fontSize: 10, fontWeight: "900" },
+  statusText: { fontSize: 10, fontWeight: "900" },
 
   section: { marginBottom: 30 },
   sectionHeader: {
@@ -184,28 +228,22 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
   },
+  emptySection: { color: "#475569", fontSize: 13, marginTop: 4 },
 
-  chartPlaceholder: {
+  statsRow: { flexDirection: "row", gap: 10 },
+  statCard: {
+    flex: 1,
     backgroundColor: "#0F172A",
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 18,
+    padding: 16,
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#1E293B",
-    height: 220,
-    justifyContent: "center",
   },
-  chartHeader: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 20,
-  },
-  legendItem: { flexDirection: "row", alignItems: "center" },
-  legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  legendText: { color: "#64748B", fontSize: 10 },
-  visualGraph: { alignItems: "center", justifyContent: "center" },
-  chartNote: { color: "#475569", fontSize: 10, marginTop: 10 },
+  statValue: { color: "#F8FAFC", fontSize: 18, fontWeight: "800", marginTop: 8 },
+  statLabel: { color: "#64748B", fontSize: 11, marginTop: 2 },
+
   insightNote: {
-    color: "#F59E0B",
     fontSize: 12,
     marginTop: 12,
     backgroundColor: "rgba(245, 158, 11, 0.1)",
@@ -215,12 +253,15 @@ const styles = StyleSheet.create({
 
   journalCard: {
     backgroundColor: "#0F172A",
-    padding: 20,
+    padding: 16,
     borderRadius: 20,
     borderLeftWidth: 4,
     borderLeftColor: "#818CF8",
+    marginBottom: 10,
   },
-  journalDate: { color: "#64748B", fontSize: 11, marginBottom: 8 },
+  journalTop: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  journalMood: { color: "#818CF8", fontSize: 12, fontWeight: "700" },
+  journalDate: { color: "#64748B", fontSize: 11 },
   journalText: {
     color: "#F8FAFC",
     fontSize: 14,
@@ -258,6 +299,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     marginTop: 10,
+    opacity: 0.5,
   },
   saveBtnText: { color: "#818CF8", fontWeight: "bold" },
 });

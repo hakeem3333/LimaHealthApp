@@ -1,107 +1,93 @@
 import React, { useState, useContext, createContext, useEffect } from "react";
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import { API_BASE_URL, saveTokens, clearTokens, apiFetch } from "../api/client";
+import { getOrgTheme, DEFAULT_THEME } from "../utils/orgTheme";
 
 const AuthContext = createContext();
 
-// --- Storage Helpers ---
-const saveItem = async (key, value) => {
-  if (Platform.OS === "web") {
-    localStorage.setItem(key, value);
-  } else {
-    await SecureStore.setItemAsync(key, value);
-  }
+const USER_KEY = "auth_user";
+
+const saveUser = async (user) => {
+  const val = JSON.stringify(user);
+  if (Platform.OS === "web") localStorage.setItem(USER_KEY, val);
+  else await SecureStore.setItemAsync(USER_KEY, val);
 };
 
-const getItem = async (key) => {
-  if (Platform.OS === "web") {
-    return localStorage.getItem(key);
-  } else {
-    return await SecureStore.getItemAsync(key);
-  }
+const loadUser = async () => {
+  const val =
+    Platform.OS === "web"
+      ? localStorage.getItem(USER_KEY)
+      : await SecureStore.getItemAsync(USER_KEY);
+  return val ? JSON.parse(val) : null;
 };
 
-const deleteItem = async (key) => {
-  if (Platform.OS === "web") {
-    localStorage.removeItem(key);
-  } else {
-    await SecureStore.deleteItemAsync(key);
-  }
+const removeUser = async () => {
+  if (Platform.OS === "web") localStorage.removeItem(USER_KEY);
+  else await SecureStore.deleteItemAsync(USER_KEY);
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadStorageData = async () => {
+    const restore = async () => {
       try {
-        const savedUser = await getItem("user");
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
-        }
+        const saved = await loadUser();
+        if (saved) setUser(saved);
       } catch (e) {
-        console.error("Failed to load auth state", e);
+        console.error("Failed to restore auth session:", e);
       } finally {
         setLoading(false);
       }
     };
-    loadStorageData();
+    restore();
   }, []);
 
   const login = async (email, password) => {
-    try {
-      // Update this URL to your production/ngrok URL when ready
-      const response = await fetch(
-        "https://3466-102-89-84-114.ngrok-free.app/api/v1/auth/login",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        },
-      );
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Login failed");
-
-      /**
-       * ROLE LOGIC:
-       * Your backend response should now include a 'role' field:
-       * data.user = { id: 1, firstName: "John", role: "COUNSELOR" | "STUDENT" }
-       */
-
-      await saveItem("token", data.token);
-      await saveItem("user", JSON.stringify(data.user));
-
-      setUser(data.user);
-      return data.user;
-    } catch (err) {
-      console.error("AuthContext Login Error:", err.message);
-      throw err;
-    }
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Client": "mobile" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Login failed");
+    await saveTokens(data.accessToken, data.refreshToken);
+    await saveUser(data.user);
+    setUser(data.user);
+    return data.user;
   };
 
   const logout = async () => {
     try {
-      await deleteItem("token");
-      await deleteItem("user");
+      await apiFetch("/auth/logout", { method: "POST" }).catch(() => {});
+    } finally {
+      await clearTokens();
+      await removeUser();
       setUser(null);
-    } catch (e) {
-      console.error("Logout failed", e);
     }
   };
 
+  // Derive org theme from user's orgType (or fall back to default)
+  const orgType = user?.orgType ?? null;
+  const theme   = getOrgTheme(orgType);
+
   const value = {
-    isLoggedIn: !!user,
     user,
-    /** * Helper getters to use throughout the app:
-     * const { isCounselor } = useAuth();
-     */
+    loading,
+    isLoggedIn:  !!user,
     isCounselor: user?.role === "COUNSELOR",
-    isStudent: user?.role === "STUDENT",
+    isMember:    user?.role === "STUDENT" || user?.role === "MEMBER",
+    isParent:    user?.role === "PARENT",
+    orgType,
+    theme,              // full theme object (primary, gradient, labels, etc.)
+    memberLabel:   theme.memberLabel,
+    membersLabel:  theme.membersLabel,
+    supportLabel:  theme.supportLabel,
+    supportsLabel: theme.supportsLabel,
     login,
     logout,
-    loading,
   };
 
   return (

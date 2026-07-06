@@ -1,106 +1,68 @@
 import React from "react";
 import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
+import { useAuth } from "../../contexts/AuthContext";
+import { BASE } from "../../utils/orgTheme";
 
-export default function StudentLayout() {
+export default function MemberLayout() {
+  const { theme } = useAuth();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#818CF8", // Bright purple for active tab
-        tabBarInactiveTintColor: "#64748B", // Slate gray for inactive
+        tabBarActiveTintColor:   theme.primary,
+        tabBarInactiveTintColor: BASE.textMuted,
         tabBarStyle: {
-          backgroundColor: "#0F172A", // Dark slate background
-          borderTopColor: "#1E293B",
-          // Adjusted height and padding for mobile comfort
-          height: Platform.OS === "ios" ? 95 : 85,
-          paddingBottom: Platform.OS === "ios" ? 35 : 70,
-          paddingTop: 10,
-          borderTopWidth: 1,
-          elevation: 0, // Removes shadow on Android for a cleaner look
+          backgroundColor:  BASE.surface,
+          borderTopColor:   BASE.border,
+          borderTopWidth:   1,
+          height:           Platform.OS === "ios" ? 90 : 72,
+          paddingBottom:    Platform.OS === "ios" ? 28 : 12,
+          paddingTop:       10,
+          elevation: 0,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600",
-          marginBottom: Platform.OS === "ios" ? 0 : 5,
-        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
-      {/* 1. Insights - biometricLog.controller.ts */}
       <Tabs.Screen
         name="home"
         options={{
           title: "Insights",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="pulse" size={26} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="pulse" size={24} color={color} />,
         }}
       />
-
-      {/* 2. Mood - moodLog.controller.ts */}
       <Tabs.Screen
         name="mood"
         options={{
           title: "Mood",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="emoticon-happy-outline"
-              size={26}
-              color={color}
-            />
-          ),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color={color} />,
         }}
       />
-
-      {/* 3. Wellness - appointment.controller.ts */}
       <Tabs.Screen
         name="wellness"
         options={{
           title: "Wellness",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="calendar-check"
-              size={26}
-              color={color}
-            />
-          ),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="calendar-heart" size={24} color={color} />,
         }}
       />
-
-      {/* 4. Alerts - alert.controller.ts */}
       <Tabs.Screen
         name="alert"
         options={{
           title: "Alerts",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="bell-outline"
-              size={26}
-              color={color}
-            />
-          ),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="bell-outline" size={24} color={color} />,
         }}
       />
-
-      {/* 5. Privacy - consent.controller.ts */}
       <Tabs.Screen
         name="privacy"
         options={{
           title: "Privacy",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="shield-check-outline"
-              size={26}
-              color={color}
-            />
-          ),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="shield-check-outline" size={24} color={color} />,
         }}
       />
-
-      {/* Hidden Screens: Kept in folder but removed from Tab Bar UI */}
-      <Tabs.Screen name="biometric" options={{ href: null }} />
-      {/* <Tabs.Screen name="profile" options={{ href: null }} /> */}
+      <Tabs.Screen name="biometric"       options={{ href: null }} />
+      <Tabs.Screen name="CounselingBooking" options={{ href: null }} />
     </Tabs>
   );
 }
