@@ -34,6 +34,7 @@ export default function HomeScreen() {
   const [lastSynced,       setLastSynced]       = useState("Not synced");
   const [selectedMood,     setSelectedMood]     = useState(null);
   const [submittingMood,   setSubmittingMood]   = useState(false);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [vitals, setVitals] = useState({
     heartRate: 0, steps: 0, calories: 0, sleep: 0,
     heartRateSeries: FALLBACK_SERIES,
@@ -85,6 +86,26 @@ export default function HomeScreen() {
     check();
   }, [user?.id, fetchVitals]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    const checkUnread = async () => {
+      try {
+        const res = await apiFetch("/messages");
+        const total = (res.data || []).reduce((sum, c) => sum + c.unreadCount, 0);
+        if (!cancelled) setHasUnreadMessages(total > 0);
+      } catch (err) {
+        console.error("Unread messages check error:", err.message);
+      }
+    };
+    checkUnread();
+    const interval = setInterval(checkUnread, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user?.id]);
+
   const submitMood = async () => {
     if (!selectedMood) return;
     setSubmittingMood(true);
@@ -135,11 +156,17 @@ export default function HomeScreen() {
               <Text style={styles.syncText}>Synced {lastSynced}</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.avatar}>
-            <Text style={[styles.avatarText, { color: theme.primary }]}>
-              {user?.firstName?.[0] ?? "U"}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.messageIconBtn} onPress={() => router.push("/(student)/messages")}>
+              <MaterialCommunityIcons name="message-text-outline" size={20} color={BASE.textSecondary} />
+              {hasUnreadMessages && <View style={styles.unreadIndicator} />}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.avatar}>
+              <Text style={[styles.avatarText, { color: theme.primary }]}>
+                {user?.firstName?.[0] ?? "U"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── AI INSIGHT HERO ── */}
@@ -259,6 +286,9 @@ const styles = StyleSheet.create({
   syncText: { color: BASE.success, fontSize: 12, fontWeight: "600" },
   avatar:   { width: 46, height: 46, borderRadius: 16, backgroundColor: BASE.surface, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: BASE.border },
   avatarText: { fontSize: 18, fontWeight: "800" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  messageIconBtn: { width: 46, height: 46, borderRadius: 16, backgroundColor: BASE.surface, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: BASE.border, position: "relative" },
+  unreadIndicator: { position: "absolute", top: 9, right: 9, width: 9, height: 9, borderRadius: 4.5, backgroundColor: "#EF4444", borderWidth: 1.5, borderColor: BASE.surface },
 
   aiCard:     { borderRadius: 24, padding: 22, marginBottom: 20 },
   aiBadge:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: "flex-start", marginBottom: 12 },

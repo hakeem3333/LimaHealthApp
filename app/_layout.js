@@ -36,6 +36,7 @@ export default function RootLayout() {
               {/* Public Routes */}
               <Stack.Screen name="index" />
               <Stack.Screen name="login" />
+              <Stack.Screen name="change-password" />
 
               {/* Protected Groups */}
               <Stack.Screen name="(student)" />

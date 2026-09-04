@@ -16,24 +16,53 @@ export default function WellnessScreen() {
   const { user, theme, supportLabel } = useAuth();
   const router = useRouter();
 
-  const [appointments, setAppointments] = useState([]);
-  const [counselors,   setCounselors]   = useState([]);
-  const [pastSessions, setPastSessions] = useState([]);
-  const [loading,      setLoading]      = useState(true);
+  const [appointments,  setAppointments]  = useState([]);
+  const [counselors,    setCounselors]    = useState([]);
+  const [pastSessions,  setPastSessions]  = useState([]);
+  const [pendingGroups, setPendingGroups] = useState([]); // counselor-proposed options awaiting a pick
+  const [loading,       setLoading]       = useState(true);
+  const [selectingId,   setSelectingId]   = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const [appts, couns] = await Promise.all([
-        apiFetch(`/appointments?userId=${user?.id}`).catch(() => []),
+        apiFetch("/appointments").catch(() => []),
         apiFetch("/users?role=COUNSELOR").catch(() => []),
       ]);
       const all = Array.isArray(appts) ? appts : appts?.data ?? [];
-      setAppointments(all.filter((a) => a.status !== "COMPLETED").slice(0, 3));
+
+      setAppointments(all.filter((a) => a.status === "CONFIRMED" || a.status === "PENDING").slice(0, 3));
       setPastSessions(all.filter((a) => a.status === "COMPLETED").slice(0, 3));
       setCounselors(Array.isArray(couns) ? couns : couns?.data ?? []);
+
+      // Group OPTION rows by groupId — each group is one counselor proposal
+      // with 2-3 candidate times still waiting on the student's pick.
+      const groups = new Map();
+      all
+        .filter((a) => a.status === "OPTION")
+        .forEach((a) => {
+          if (!groups.has(a.groupId)) groups.set(a.groupId, []);
+          groups.get(a.groupId).push(a);
+        });
+      setPendingGroups(
+        [...groups.values()].map((options) => [...options].sort((a, b) => new Date(a.startTime) - new Date(b.startTime))),
+      );
     } catch {}
     finally { setLoading(false); }
+  };
+
+  const handleSelectOption = async (appointmentId) => {
+    setSelectingId(appointmentId);
+    try {
+      await apiFetch(`/appointments/${appointmentId}/select`, { method: "POST" });
+      Toast.show({ type: "success", text1: "Time confirmed!" });
+      fetchData();
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Could not confirm", text2: err?.data?.error || err.message });
+    } finally {
+      setSelectingId(null);
+    }
   };
 
   useEffect(() => { if (user?.id) fetchData(); }, [user?.id]);
@@ -83,12 +112,66 @@ export default function WellnessScreen() {
         </LinearGradient>
       </TouchableOpacity>
 
+      {/* NEEDS YOUR RESPONSE — counselor-proposed time options */}
+      {pendingGroups.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Needs Your Response</Text>
+          {pendingGroups.map((group) => (
+            <View key={group[0].groupId} style={styles.proposalCard}>
+              <View style={styles.proposalHeader}>
+                <View style={[styles.proposalIcon, { backgroundColor: BASE.warning + "18" }]}>
+                  <MaterialCommunityIcons name="calendar-question" size={18} color={BASE.warning} />
+                </View>
+                <Text style={styles.proposalTitle}>
+                  Your {supportLabel.toLowerCase()} proposed {group.length} times
+                </Text>
+              </View>
+              {group.map((option) => {
+                const date = new Date(option.startTime);
+                const isBusy = selectingId === option.id;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={styles.optionRow}
+                    activeOpacity={0.75}
+                    disabled={!!selectingId}
+                    onPress={() => handleSelectOption(option.id)}
+                  >
+                    <View style={styles.optionDateWrap}>
+                      <Text style={styles.optionDay}>
+                        {date.toLocaleDateString([], { weekday: "short" })}
+                      </Text>
+                      <Text style={styles.optionDate}>
+                        {date.toLocaleDateString([], { month: "short", day: "numeric" })}
+                      </Text>
+                    </View>
+                    <Text style={styles.optionTime}>
+                      {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </Text>
+                    {isBusy ? (
+                      <ActivityIndicator size="small" color={theme.primary} />
+                    ) : (
+                      <View style={[styles.optionPickBtn, { backgroundColor: theme.primary }]}>
+                        <Text style={styles.optionPickText}>Pick</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+        </>
+      )}
+
       {/* UPCOMING SESSIONS */}
       {appointments.length > 0 && (
         <>
           <Text style={styles.sectionTitle}>Upcoming Sessions</Text>
           {appointments.map((appt) => {
-            const date = new Date(appt.scheduledAt || appt.date);
+            const date = new Date(appt.startTime);
+            const counselorName = appt.counselor
+              ? `${appt.counselor.firstName} ${appt.counselor.lastName}`
+              : supportLabel;
             return (
               <View key={appt.id} style={styles.apptCard}>
                 <View style={[styles.datePill, { backgroundColor: theme.primary + "18", borderColor: theme.primary + "40" }]}>
@@ -100,7 +183,7 @@ export default function WellnessScreen() {
                   </Text>
                 </View>
                 <View style={styles.apptInfo}>
-                  <Text style={styles.apptName}>{appt.counselorName || appt.counselor?.firstName || supportLabel}</Text>
+                  <Text style={styles.apptName}>{counselorName}</Text>
                   <Text style={styles.apptTime}>
                     {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </Text>
@@ -157,9 +240,9 @@ export default function WellnessScreen() {
                 <MaterialCommunityIcons name="file-document-check-outline" size={20} color={BASE.success} />
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={styles.pastTitle}>{s.type || "Wellness Session"}</Text>
+                <Text style={styles.pastTitle}>{s.reason || "Wellness Session"}</Text>
                 <Text style={styles.pastDate}>
-                  {new Date(s.scheduledAt || s.date).toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}
+                  {new Date(s.startTime).toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}
                 </Text>
               </View>
               <MaterialCommunityIcons name="download-outline" size={20} color={BASE.textMuted} />
@@ -188,6 +271,18 @@ const styles = StyleSheet.create({
 
   sectionTitle: { color: BASE.textPrimary, fontSize: 17, fontWeight: "700", marginBottom: 14, marginTop: 4 },
   emptyText:    { color: BASE.textMuted, fontSize: 13, marginBottom: 20 },
+
+  proposalCard:   { backgroundColor: BASE.surface, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: BASE.warning + "40" },
+  proposalHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  proposalIcon:   { width: 32, height: 32, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  proposalTitle:  { color: BASE.textPrimary, fontSize: 13, fontWeight: "700", flex: 1 },
+  optionRow:      { flexDirection: "row", alignItems: "center", backgroundColor: BASE.surfaceAlt, borderRadius: 14, padding: 12, marginBottom: 8, gap: 12 },
+  optionDateWrap: { minWidth: 54 },
+  optionDay:      { color: BASE.textMuted, fontSize: 11, fontWeight: "600" },
+  optionDate:     { color: BASE.textPrimary, fontSize: 13, fontWeight: "700", marginTop: 2 },
+  optionTime:     { color: BASE.textSecondary, fontSize: 14, fontWeight: "600", flex: 1 },
+  optionPickBtn:  { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10 },
+  optionPickText: { color: "#FFF", fontSize: 12, fontWeight: "800" },
 
   apptCard:  { backgroundColor: BASE.surface, borderRadius: 20, padding: 16, flexDirection: "row", alignItems: "center", marginBottom: 10, borderWidth: 1, borderColor: BASE.border },
   datePill:  { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, alignItems: "center", minWidth: 52, borderWidth: 1, marginRight: 14 },

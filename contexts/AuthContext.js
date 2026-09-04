@@ -59,6 +59,13 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
+  const updateUser = async (patch) => {
+    const updated = { ...user, ...patch };
+    await saveUser(updated);
+    setUser(updated);
+    return updated;
+  };
+
   const logout = async () => {
     try {
       await apiFetch("/auth/logout", { method: "POST" }).catch(() => {});
@@ -88,6 +95,7 @@ export const AuthProvider = ({ children }) => {
     supportsLabel: theme.supportsLabel,
     login,
     logout,
+    updateUser,
   };
 
   return (

@@ -25,10 +25,10 @@ export default function AlertsScreen() {
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch(`/alerts?userId=${user?.id}`);
+      const data = await apiFetch("/alerts");
       const all  = Array.isArray(data) ? data : data?.data ?? [];
-      const active   = all.filter((a) => a.status !== "RESOLVED");
-      const resolved = all.filter((a) => a.status === "RESOLVED");
+      const active   = all.filter((a) => !a.isResolved);
+      const resolved = all.filter((a) => a.isResolved);
       const result = [];
       if (active.length)   result.push({ title: "Active", data: active });
       if (resolved.length) result.push({ title: "Resolved", data: resolved });
@@ -69,7 +69,7 @@ export default function AlertsScreen() {
           {item.body || item.detail ? (
             <Text style={styles.alertDesc} numberOfLines={2}>{item.body || item.detail}</Text>
           ) : null}
-          {isCritical && item.status !== "RESOLVED" && (
+          {isCritical && !item.isResolved && (
             <TouchableOpacity
               style={[styles.resolveBtn, { backgroundColor: s.color }]}
               onPress={() => resolveAlert(item.id)}

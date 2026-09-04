@@ -1,12 +1,17 @@
 import React from "react";
-import { Tabs } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Platform, View } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { BASE } from "../../utils/orgTheme";
 
 export default function MemberLayout() {
-  const { theme } = useAuth();
+  const { theme, user } = useAuth();
+
+  // Force a password change for temp-password accounts before any tab renders
+  if (user?.mustChangePassword) {
+    return <Redirect href="/change-password" />;
+  }
 
   return (
     <Tabs
@@ -63,6 +68,7 @@ export default function MemberLayout() {
       />
       <Tabs.Screen name="biometric"       options={{ href: null }} />
       <Tabs.Screen name="CounselingBooking" options={{ href: null }} />
+      <Tabs.Screen name="messages"        options={{ href: null }} />
     </Tabs>
   );
 }

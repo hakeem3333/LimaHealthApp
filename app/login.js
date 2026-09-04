@@ -58,7 +58,8 @@ export default function LoginScreen() {
       const user = await login(email, password);
       Toast.show({ type: "success", text1: `Welcome, ${user.firstName}!`, text2: "Signed in successfully" });
       setTimeout(() => {
-        if (user.role === "COUNSELOR") router.replace("/(counselor)/dashboard");
+        if (user.mustChangePassword) router.replace("/change-password");
+        else if (user.role === "COUNSELOR") router.replace("/(counselor)/dashboard");
         else router.replace("/(student)/home");
       }, 400);
     } catch (err) {
