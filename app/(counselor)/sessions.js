@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Switch, Alert, ActivityIndicator, RefreshControl,
+  Switch, ActivityIndicator, RefreshControl,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,13 +11,15 @@ import Toast from "react-native-toast-message";
 
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
+import { confirmAction } from "../../utils/confirm";
 
 const TABS = ["Today", "Upcoming", "Proposed", "Past"];
 
 export default function SessionManager() {
   const router = useRouter();
   const { membersLabel, theme } = useAuth();
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const accent = theme?.primary ?? BASE.success;
   const [isAvailable, setIsAvailable]     = useState(true);
   const [appointments, setAppointments]   = useState([]);
@@ -101,57 +103,48 @@ export default function SessionManager() {
   };
 
   const handleAction = (id, action) => {
-    const status = action === "Accept" ? "CONFIRMED" : "CANCELLED";
-    Alert.alert(
-      `${action} Session`,
-      `Are you sure you want to ${action.toLowerCase()} this session?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: action,
-          style: action === "Reject" ? "destructive" : "default",
-          onPress: async () => {
-            try {
-              await apiFetch(`/appointments/${id}/status`, {
-                method: "PATCH",
-                body: JSON.stringify({ status }),
-              });
-              setAppointments((prev) =>
-                prev.map((a) => (a.id === id ? { ...a, status } : a))
-              );
-              Toast.show({ type: "success", text1: `Session ${status.toLowerCase()}` });
-            } catch (err) {
-              Toast.show({ type: "error", text1: "Action failed", text2: err.message });
-            }
-          },
-        },
-      ]
-    );
+    const status = action === "Accept" ? "CONFIRMED" : action === "Complete" ? "COMPLETED" : "CANCELLED";
+    confirmAction({
+      title: `${action} Session`,
+      message: `Are you sure you want to ${action.toLowerCase()} this session?`,
+      confirmText: action,
+      destructive: action === "Reject",
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/appointments/${id}/status`, {
+            method: "PATCH",
+            body: JSON.stringify({ status }),
+          });
+          setAppointments((prev) =>
+            prev.map((a) => (a.id === id ? { ...a, status } : a))
+          );
+          Toast.show({ type: "success", text1: `Session ${status.toLowerCase()}` });
+        } catch (err) {
+          Toast.show({ type: "error", text1: "Action failed", text2: err?.data?.error || err.message });
+        }
+      },
+    });
   };
 
   const cancelProposal = (groupId) => {
-    Alert.alert(
-      "Withdraw Proposal",
-      "This removes all proposed times for this student. They will no longer be able to pick any of them.",
-      [
-        { text: "Keep it", style: "cancel" },
-        {
-          text: "Withdraw",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiFetch(`/appointments/group/${groupId}/cancel`, { method: "PATCH" });
-              setAppointments((prev) =>
-                prev.map((a) => (a.groupId === groupId ? { ...a, status: "CANCELLED" } : a))
-              );
-              Toast.show({ type: "success", text1: "Proposal withdrawn" });
-            } catch (err) {
-              Toast.show({ type: "error", text1: "Could not withdraw", text2: err.message });
-            }
-          },
-        },
-      ]
-    );
+    confirmAction({
+      title: "Withdraw Proposal",
+      message: "This removes all proposed times for this student. They will no longer be able to pick any of them.",
+      confirmText: "Withdraw",
+      cancelText: "Keep it",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/appointments/group/${groupId}/cancel`, { method: "PATCH" });
+          setAppointments((prev) =>
+            prev.map((a) => (a.groupId === groupId ? { ...a, status: "CANCELLED" } : a))
+          );
+          Toast.show({ type: "success", text1: "Proposal withdrawn" });
+        } catch (err) {
+          Toast.show({ type: "error", text1: "Could not withdraw", text2: err?.data?.error || err.message });
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -203,7 +196,7 @@ export default function SessionManager() {
 
         <TouchableOpacity style={styles.hoursLink} onPress={() => router.push("/(counselor)/availability")}>
           <MaterialCommunityIcons name="clock-outline" size={16} color={BASE.info} />
-          <Text style={styles.hoursLinkText}>Set weekly working hours</Text>
+          <Text style={styles.hoursLinkText}>Working hours & time off</Text>
           <MaterialCommunityIcons name="chevron-right" size={18} color={BASE.textMuted} style={{ marginLeft: "auto" }} />
         </TouchableOpacity>
 
@@ -289,6 +282,9 @@ export default function SessionManager() {
             activeList.map((appt) => {
               const isPending = appt.status === "PENDING";
               const isCancelled = appt.status === "CANCELLED";
+              // A confirmed session that has started can be closed out, even
+              // once it has slipped into the Past tab.
+              const canComplete = appt.status === "CONFIRMED" && new Date(appt.startTime) <= new Date();
               return (
                 <View key={appt.id} style={isPending ? styles.requestCard : styles.confirmedCard}>
                   <View style={styles.rowTop}>
@@ -331,7 +327,15 @@ export default function SessionManager() {
                     </View>
                   )}
 
-                  {!isHistorical && !isPending && (
+                  {canComplete && (
+                    <View style={styles.actionButtons}>
+                      <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAction(appt.id, "Complete")}>
+                        <Text style={styles.acceptText}>Mark Completed</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {!isHistorical && !isPending && !canComplete && (
                     <TouchableOpacity style={styles.cancelBtn} onPress={() => handleAction(appt.id, "Reject")}>
                       <Text style={styles.cancelText}>Cancel</Text>
                     </TouchableOpacity>
@@ -344,12 +348,11 @@ export default function SessionManager() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-      <Toast />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container:        { flex: 1, backgroundColor: BASE.bg },
   center:            { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BASE.bg },
   header:            { padding: 20, paddingBottom: 8 },

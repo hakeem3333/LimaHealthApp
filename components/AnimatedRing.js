@@ -1,12 +1,14 @@
 import React from "react";
 import { View, Text } from "react-native";
 import Svg, { Circle } from "react-native-svg";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function AnimatedRing({
   size = 120,
   stroke = 10,
   progress = 75,
 }) {
+  const { colors: BASE } = useTheme();
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (progress / 100) * circumference;
@@ -22,7 +24,7 @@ export default function AnimatedRing({
     >
       <Svg width={size} height={size}>
         <Circle
-          stroke="#e6e6f7"
+          stroke={BASE.border}
           cx={size / 2}
           cy={size / 2}
           r={radius}
@@ -42,8 +44,8 @@ export default function AnimatedRing({
       </Svg>
 
       <View style={{ position: "absolute", alignItems: "center" }}>
-        <Text style={{ fontSize: 20, fontWeight: "800" }}>{progress}</Text>
-        <Text style={{ color: "#64748b" }}>/100</Text>
+        <Text style={{ fontSize: 20, fontWeight: "800", color: BASE.textPrimary }}>{progress}</Text>
+        <Text style={{ color: BASE.textMuted }}>/100</Text>
       </View>
     </View>
   );

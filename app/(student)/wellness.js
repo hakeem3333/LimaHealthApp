@@ -2,18 +2,19 @@ import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, FlatList, ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+  RefreshControl, } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch } from "../../api/client";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
+import { confirmAction } from "../../utils/confirm";
 
 export default function WellnessScreen() {
   const { user, theme, supportLabel } = useAuth();
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const router = useRouter();
 
   const [appointments,  setAppointments]  = useState([]);
@@ -22,6 +23,7 @@ export default function WellnessScreen() {
   const [pendingGroups, setPendingGroups] = useState([]); // counselor-proposed options awaiting a pick
   const [loading,       setLoading]       = useState(true);
   const [selectingId,   setSelectingId]   = useState(null);
+  const [cancellingId,  setCancellingId]  = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -32,8 +34,18 @@ export default function WellnessScreen() {
       ]);
       const all = Array.isArray(appts) ? appts : appts?.data ?? [];
 
-      setAppointments(all.filter((a) => a.status === "CONFIRMED" || a.status === "PENDING").slice(0, 3));
-      setPastSessions(all.filter((a) => a.status === "COMPLETED").slice(0, 3));
+      const now = new Date();
+      setAppointments(
+        all
+          .filter((a) => (a.status === "CONFIRMED" || a.status === "PENDING") && new Date(a.endTime) > now)
+          .slice(0, 3),
+      );
+      setPastSessions(
+        all
+          .filter((a) => a.status === "COMPLETED")
+          .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
+          .slice(0, 3),
+      );
       setCounselors(Array.isArray(couns) ? couns : couns?.data ?? []);
 
       // Group OPTION rows by groupId — each group is one counselor proposal
@@ -63,6 +75,31 @@ export default function WellnessScreen() {
     } finally {
       setSelectingId(null);
     }
+  };
+
+  // Cancelling an OPTION declines the whole proposal on the server.
+  const confirmCancel = (appointmentId, { isProposal = false } = {}) => {
+    confirmAction({
+      title: isProposal ? "Decline these times?" : "Cancel session?",
+      message: isProposal
+        ? `Your ${supportLabel.toLowerCase()} will need to propose new times.`
+        : `Your ${supportLabel.toLowerCase()} will see that you cancelled.`,
+      confirmText: isProposal ? "Decline" : "Cancel session",
+      cancelText: "Keep it",
+      destructive: true,
+      onConfirm: async () => {
+        setCancellingId(appointmentId);
+        try {
+          await apiFetch(`/appointments/${appointmentId}/cancel`, { method: "PATCH" });
+          Toast.show({ type: "success", text1: isProposal ? "Times declined" : "Session cancelled" });
+          fetchData();
+        } catch (err) {
+          Toast.show({ type: "error", text1: "Could not cancel", text2: err?.data?.error || err.message });
+        } finally {
+          setCancellingId(null);
+        }
+      },
+    });
   };
 
   useEffect(() => { if (user?.id) fetchData(); }, [user?.id]);
@@ -158,6 +195,13 @@ export default function WellnessScreen() {
                   </TouchableOpacity>
                 );
               })}
+              <TouchableOpacity
+                style={styles.declineBtn}
+                disabled={!!selectingId || cancellingId === group[0].id}
+                onPress={() => confirmCancel(group[0].id, { isProposal: true })}
+              >
+                <Text style={[styles.declineText, { color: BASE.error }]}>None of these work</Text>
+              </TouchableOpacity>
             </View>
           ))}
         </>
@@ -188,7 +232,18 @@ export default function WellnessScreen() {
                     {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </Text>
                 </View>
-                <StatusBadge status={appt.status} />
+                <View style={styles.apptRight}>
+                  <StatusBadge status={appt.status} />
+                  {new Date(appt.startTime) > new Date() && (
+                    cancellingId === appt.id ? (
+                      <ActivityIndicator size="small" color={BASE.error} />
+                    ) : (
+                      <TouchableOpacity onPress={() => confirmCancel(appt.id)} hitSlop={8}>
+                        <Text style={[styles.cancelLink, { color: BASE.error }]}>Cancel</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                </View>
               </View>
             );
           })}
@@ -252,12 +307,11 @@ export default function WellnessScreen() {
       )}
 
       <View style={{ height: 40 }} />
-      <Toast />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container:    { flex: 1, backgroundColor: BASE.bg, paddingHorizontal: 20 },
   header:       { marginTop: 60, marginBottom: 24 },
   title:        { color: BASE.textPrimary, fontSize: 28, fontWeight: "800" },
@@ -283,6 +337,8 @@ const styles = StyleSheet.create({
   optionTime:     { color: BASE.textSecondary, fontSize: 14, fontWeight: "600", flex: 1 },
   optionPickBtn:  { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10 },
   optionPickText: { color: "#FFF", fontSize: 12, fontWeight: "800" },
+  declineBtn:     { alignSelf: "center", paddingVertical: 6, marginTop: 2 },
+  declineText:    { fontSize: 12, fontWeight: "700" },
 
   apptCard:  { backgroundColor: BASE.surface, borderRadius: 20, padding: 16, flexDirection: "row", alignItems: "center", marginBottom: 10, borderWidth: 1, borderColor: BASE.border },
   datePill:  { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, alignItems: "center", minWidth: 52, borderWidth: 1, marginRight: 14 },
@@ -293,6 +349,8 @@ const styles = StyleSheet.create({
   apptTime:  { color: BASE.textSecondary, fontSize: 12, marginTop: 3 },
   badge:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   badgeText: { fontSize: 10, fontWeight: "800" },
+  apptRight: { alignItems: "flex-end", gap: 8 },
+  cancelLink:{ fontSize: 12, fontWeight: "700" },
 
   counselorCard: { backgroundColor: BASE.surface, width: 155, padding: 18, borderRadius: 22, alignItems: "center", borderWidth: 1, borderColor: BASE.border },
   counselorAvatar: { width: 56, height: 56, borderRadius: 18, justifyContent: "center", alignItems: "center", marginBottom: 10 },

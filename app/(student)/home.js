@@ -1,21 +1,68 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Dimensions, ActivityIndicator, Platform,
+  TouchableOpacity, Dimensions, ActivityIndicator, Platform, RefreshControl,
 } from "react-native";
+import * as Linking from "expo-linking";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { LineChart } from "react-native-gifted-charts";
+import { Image } from "expo-image";
 import * as WebBrowser from "expo-web-browser";
-import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import Toast from "react-native-toast-message";
 import { useAuth } from "../../contexts/AuthContext";
 import FitbitOnboardingModal from "../../components/FitbitOnboardingModal";
-import { apiFetch, API_BASE_URL } from "../../api/client";
-import { BASE } from "../../utils/orgTheme";
+import { apiFetch, API_ORIGIN } from "../../api/client";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 const FALLBACK_SERIES = [{ value: 0, label: "..." }];
+const FITBIT_SKIP_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+const fitbitSkipKey = (userId) => `fitbit_skip_${userId}`;
+
+// "14:32" for today's readings, "Mon 14:32" for older ones.
+const formatSyncedAt = (iso) => {
+  if (!iso) return "Not synced";
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString()
+    ? time
+    : `${d.toLocaleDateString([], { weekday: "short" })} ${time}`;
+};
+
+const getFitbitSkippedAt = async (userId) => {
+  const key = fitbitSkipKey(userId);
+  const val =
+    Platform.OS === "web"
+      ? localStorage.getItem(key)
+      : await SecureStore.getItemAsync(key);
+  return val ? Number(val) : null;
+};
+
+const setFitbitSkippedNow = async (userId) => {
+  const key = fitbitSkipKey(userId);
+  const val = String(Date.now());
+  if (Platform.OS === "web") localStorage.setItem(key, val);
+  else await SecureStore.setItemAsync(key, val);
+};
+
+// Toast for the backend's ?success= / ?error= on the Fitbit return URL.
+// Returns true when the link succeeded.
+const showFitbitLinkResult = (queryParams) => {
+  if (queryParams?.error) {
+    const msg = {
+      fitbit_already_linked_to_other: "This Fitbit is already linked to another account.",
+      missing_permissions: "Please allow access to all the listed data on the Google screen.",
+    }[queryParams.error] ?? "Fitbit linking didn't complete. Please try again.";
+    Toast.show({ type: "error", text1: "Couldn't connect Fitbit", text2: msg });
+    return false;
+  }
+  Toast.show({ type: "success", text1: "Fitbit connected", text2: "Pulling your latest data…" });
+  return true;
+};
 
 const MOOD_OPTIONS = [
   { icon: "emoticon-excited-outline", label: "Great", value: "GREAT", color: "#10B981" },
@@ -25,6 +72,7 @@ const MOOD_OPTIONS = [
 ];
 
 export default function HomeScreen() {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const { user, theme, memberLabel, supportLabel } = useAuth();
   const router = useRouter();
 
@@ -32,11 +80,13 @@ export default function HomeScreen() {
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [aiInsight,        setAiInsight]        = useState(null);
   const [lastSynced,       setLastSynced]       = useState("Not synced");
+  const [isLinked,         setIsLinked]         = useState(false);
+  const [refreshing,       setRefreshing]       = useState(false);
   const [selectedMood,     setSelectedMood]     = useState(null);
   const [submittingMood,   setSubmittingMood]   = useState(false);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [vitals, setVitals] = useState({
-    heartRate: 0, steps: 0, calories: 0, sleep: 0,
+    heartRate: 0, steps: 0, calories: 0, sleep: 0, sleepTarget: 8,
     heartRateSeries: FALLBACK_SERIES,
   });
 
@@ -55,9 +105,11 @@ export default function HomeScreen() {
         steps:           data.steps           || 0,
         calories:        data.calories        || 0,
         sleep:           data.sleep           || 0,
-        heartRateSeries: data.heartRateSeries || FALLBACK_SERIES,
+        sleepTarget:     data.sleepTarget     || 8, // org's sleep target
+        heartRateSeries: data.heartRateSeries?.length ? data.heartRateSeries : FALLBACK_SERIES,
       });
-      setLastSynced(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      setLastSynced(formatSyncedAt(data.syncedAt));
+      if (!data.syncedAt) return; // nothing stored yet — no vitals to analyse
       try {
         const insight = await apiFetch("/ai/analyze", {
           method: "POST",
@@ -70,21 +122,63 @@ export default function HomeScreen() {
     }
   }, [user?.id]);
 
+  // Ask the backend to pull fresh data from Fitbit, then reload what's stored.
+  // The server throttles syncs, so calling this on every visit is cheap.
+  const syncAndLoad = useCallback(async (force = false) => {
+    try {
+      await apiFetch(`/fitbit/sync${force ? "?force=true" : ""}`, { method: "POST" });
+    } catch (err) {
+      if (err.status === 409 || err.status === 404) {
+        // Link was revoked on Fitbit's side — prompt to reconnect.
+        setIsLinked(false);
+        setIsModalVisible(true);
+      } else if (force) {
+        Toast.show({ type: "error", text1: "Couldn't sync Fitbit", text2: "Showing your last saved data." });
+      }
+    }
+    await fetchVitals();
+  }, [fetchVitals]);
+
   useEffect(() => {
     if (!user?.id) return;
     const check = async () => {
       try {
         const status = await apiFetch(`/fitbit/status/${user.id}`);
-        setIsModalVisible(!status.isLinked);
-        if (status.isLinked) await fetchVitals();
-      } catch {
-        setIsModalVisible(true);
+        setIsLinked(!!status.isLinked);
+        if (status.isLinked) {
+          setIsModalVisible(false);
+          await fetchVitals();          // show stored data immediately…
+          syncAndLoad();                // …then refresh from Fitbit in the background
+        } else {
+          fetchVitals();                // readings from before an unlink are still stored
+          const skippedAt = await getFitbitSkippedAt(user.id);
+          const onCooldown = skippedAt && Date.now() - skippedAt < FITBIT_SKIP_COOLDOWN_MS;
+          setIsModalVisible(!onCooldown);
+        }
+      } catch (err) {
+        // Status check failed (e.g. network error) — don't nag with the
+        // onboarding modal for something unrelated to the user's Fitbit link.
+        console.error("Fitbit status check error:", err.message);
       } finally {
         setIsCheckingStatus(false);
       }
     };
     check();
-  }, [user?.id, fetchVitals]);
+  }, [user?.id, fetchVitals, syncAndLoad]);
+
+  // Web: if the browser opened the Fitbit flow in this tab instead of a popup
+  // (popup blocked, or opened as a tab), we land back here with the result in
+  // the URL and openAuthSessionAsync never resolves — report it from the URL.
+  const { success: linkSuccess, error: linkError } = useLocalSearchParams();
+  useEffect(() => {
+    if (Platform.OS !== "web" || window.opener) return;
+    if (!linkSuccess && !linkError) return;
+    showFitbitLinkResult({ success: linkSuccess, error: linkError });
+    // Drop the query so a reload doesn't repeat the toast. Done without a
+    // navigation (which would hide the toast), once the router has written
+    // its own URL.
+    setTimeout(() => window.history.replaceState(window.history.state, "", window.location.pathname), 1000);
+  }, [linkSuccess, linkError]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -120,16 +214,35 @@ export default function HomeScreen() {
     }
   };
 
-  const handleFitbitConnect = async () => {
-    const redirectUri = Platform.OS === "web" ? "http://localhost:8081/home" : "limahealth://home";
+  const onRefresh = async () => {
+    setRefreshing(true);
     try {
-      const result = await WebBrowser.openAuthSessionAsync(`${API_BASE_URL}/fitbit/auth?userId=${user?.id}`, redirectUri);
-      if (result.type === "success") {
-        setIsModalVisible(false);
-        setIsCheckingStatus(true);
-        setTimeout(fetchVitals, 2000);
-      }
-    } catch (err) { console.error(err); }
+      if (isLinked) await syncAndLoad(true);
+      else await fetchVitals();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleFitbitConnect = async () => {
+    // Where the backend sends the browser back to after Fitbit consent:
+    // limahealth://home in builds, exp://… in Expo Go, http://…/home on web.
+    const redirectUri = Linking.createURL("/home");
+    try {
+      const { url } = await apiFetch(`/fitbit/auth-url?redirect=${encodeURIComponent(redirectUri)}`);
+      const result = await WebBrowser.openAuthSessionAsync(url, redirectUri);
+      if (result.type !== "success") return;
+
+      const { queryParams } = Linking.parse(result.url);
+      if (!showFitbitLinkResult(queryParams)) return;
+
+      setIsModalVisible(false);
+      setIsLinked(true);
+      await syncAndLoad(true);
+    } catch (err) {
+      console.error("Fitbit connect error:", err.message);
+      Toast.show({ type: "error", text1: "Couldn't connect Fitbit", text2: err.message });
+    }
   };
 
   if (isCheckingStatus) {
@@ -144,7 +257,11 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
+      >
 
         {/* ── HEADER ── */}
         <View style={styles.header}>
@@ -152,8 +269,12 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>Good morning,</Text>
             <Text style={styles.name}>{user?.firstName || memberLabel} 👋</Text>
             <View style={styles.syncRow}>
-              <View style={[styles.syncDot, { backgroundColor: BASE.success }]} />
-              <Text style={styles.syncText}>Synced {lastSynced}</Text>
+              <View style={[styles.syncDot, { backgroundColor: isLinked ? BASE.success : BASE.textMuted }]} />
+              <Text style={[styles.syncText, !isLinked && { color: BASE.textMuted }]}>
+                {isLinked
+                  ? `Synced ${lastSynced}`
+                  : lastSynced === "Not synced" ? "Fitbit not connected" : `Fitbit not connected · last data ${lastSynced}`}
+              </Text>
             </View>
           </View>
           <View style={styles.headerActions}>
@@ -161,10 +282,18 @@ export default function HomeScreen() {
               <MaterialCommunityIcons name="message-text-outline" size={20} color={BASE.textSecondary} />
               {hasUnreadMessages && <View style={styles.unreadIndicator} />}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.avatar}>
-              <Text style={[styles.avatarText, { color: theme.primary }]}>
-                {user?.firstName?.[0] ?? "U"}
-              </Text>
+            <TouchableOpacity style={styles.avatar} onPress={() => router.push("/(student)/profile")}>
+              {user?.profileImage ? (
+                <Image
+                  source={{ uri: `${API_ORIGIN}${user.profileImage}` }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <Text style={[styles.avatarText, { color: theme.primary }]}>
+                  {user?.firstName?.[0] ?? "U"}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -192,7 +321,7 @@ export default function HomeScreen() {
           {[
             { icon: "walk",                label: "Steps",    val: vitals.steps.toLocaleString(),   sub: "/ 10k",   color: BASE.success },
             { icon: "fire",                label: "Calories", val: vitals.calories.toString(),       sub: "kcal",    color: BASE.warning },
-            { icon: "moon-waning-crescent",label: "Sleep",    val: `${vitals.sleep}h`,              sub: "/ 8h",    color: "#818CF8"   },
+            { icon: "moon-waning-crescent",label: "Sleep",    val: `${vitals.sleep}h`,              sub: `/ ${vitals.sleepTarget}h`, color: "#818CF8"   },
             { icon: "heart-pulse",         label: "Heart",    val: `${vitals.heartRate}`,            sub: "bpm",     color: BASE.error  },
           ].map((v) => (
             <View key={v.label} style={styles.vitalCard}>
@@ -250,6 +379,10 @@ export default function HomeScreen() {
           <LineChart
             data={vitals.heartRateSeries}
             areaChart curved height={160} hideDataPoints
+            isAnimated animationDuration={1400}
+            // No animateOnDataChange: it interpolates between old/new SVG path
+            // strings, which crashes ("All elements of output range should have
+            // the same number of components") when a curved series changes length.
             color={BASE.error} thickness={2.5}
             startFillColor="rgba(239,68,68,0.25)"
             endFillColor="rgba(239,68,68,0.01)"
@@ -265,17 +398,17 @@ export default function HomeScreen() {
 
       <FitbitOnboardingModal
         isVisible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
+        onClose={() => {
+          setIsModalVisible(false);
+          setFitbitSkippedNow(user?.id);
+        }}
         onConnect={handleFitbitConnect}
       />
-      <Toast />
     </View>
   );
 }
 
-const CARD_W = (width - 56) / 4;
-
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container: { flex: 1, backgroundColor: BASE.bg, paddingHorizontal: 20 },
 
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginTop: Platform.OS === "ios" ? 60 : 50, marginBottom: 24 },
@@ -284,8 +417,9 @@ const styles = StyleSheet.create({
   syncRow:  { flexDirection: "row", alignItems: "center", marginTop: 6 },
   syncDot:  { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
   syncText: { color: BASE.success, fontSize: 12, fontWeight: "600" },
-  avatar:   { width: 46, height: 46, borderRadius: 16, backgroundColor: BASE.surface, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: BASE.border },
+  avatar:   { width: 46, height: 46, borderRadius: 16, backgroundColor: BASE.surface, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: BASE.border, overflow: "hidden" },
   avatarText: { fontSize: 18, fontWeight: "800" },
+  avatarImage: { width: "100%", height: "100%" },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   messageIconBtn: { width: 46, height: 46, borderRadius: 16, backgroundColor: BASE.surface, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: BASE.border, position: "relative" },
   unreadIndicator: { position: "absolute", top: 9, right: 9, width: 9, height: 9, borderRadius: 4.5, backgroundColor: "#EF4444", borderWidth: 1.5, borderColor: BASE.surface },
@@ -309,8 +443,8 @@ const styles = StyleSheet.create({
   cardTitle:  { color: BASE.textPrimary, fontSize: 17, fontWeight: "700" },
   cardSub:    { color: BASE.textMuted, fontSize: 12, marginTop: 3, marginBottom: 16 },
 
-  moodRow:       { flexDirection: "row", justifyContent: "space-between" },
-  moodBtn:       { width: CARD_W, paddingVertical: 14, alignItems: "center", borderRadius: 18, borderWidth: 1, borderColor: BASE.border, backgroundColor: BASE.bg },
+  moodRow:       { flexDirection: "row", gap: 8 },
+  moodBtn:       { flex: 1, paddingVertical: 14, alignItems: "center", borderRadius: 18, borderWidth: 1, borderColor: BASE.border, backgroundColor: BASE.bg },
   moodBtnLabel:  { color: BASE.textMuted, fontSize: 10, fontWeight: "600", marginTop: 6 },
   moodSubmit:    { borderRadius: 16, paddingVertical: 13, alignItems: "center", marginTop: 14 },
   moodSubmitText:{ color: "#FFF", fontWeight: "700", fontSize: 15 },

@@ -6,7 +6,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch } from "../../api/client";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 const SEVERITY = {
   CRITICAL: { color: "#EF4444", bg: "#EF444415", icon: "alert-octagon", border: "#EF444440" },
@@ -17,6 +17,7 @@ const SEVERITY = {
 };
 
 export default function AlertsScreen() {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const { user, theme } = useAuth();
   const [sections,  setSections]  = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -54,7 +55,7 @@ export default function AlertsScreen() {
     return (
       <TouchableOpacity
         activeOpacity={0.85}
-        style={[styles.alertCard, { borderLeftColor: s.color, backgroundColor: isCritical ? "#110808" : BASE.surface }]}
+        style={[styles.alertCard, { borderLeftColor: s.color, backgroundColor: isCritical ? BASE.error + "12" : BASE.surface }]}
       >
         <View style={[styles.alertIcon, { backgroundColor: s.bg }]}>
           <MaterialCommunityIcons name={s.icon} size={20} color={s.color} />
@@ -132,7 +133,7 @@ export default function AlertsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container: { flex: 1, backgroundColor: BASE.bg },
   header:    { marginTop: 60, paddingHorizontal: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
   title:     { color: BASE.textPrimary, fontSize: 28, fontWeight: "800" },

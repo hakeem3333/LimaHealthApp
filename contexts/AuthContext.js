@@ -1,4 +1,4 @@
-import React, { useState, useContext, createContext, useEffect } from "react";
+import React, { useState, useContext, createContext, useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { API_BASE_URL, saveTokens, clearTokens, apiFetch } from "../api/client";
@@ -59,6 +59,39 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
+  // Parent accounts are passwordless — two-step email OTP login. The server
+  // hands back a tempToken (mobile has no reliable cookie jar between steps);
+  // a ref holds it in memory just long enough to submit the code, surviving
+  // re-renders between the two calls without needing to be render state.
+  const parentOtpTempTokenRef = useRef(null);
+
+  const requestParentOtp = async (email) => {
+    const response = await fetch(`${API_BASE_URL}/auth/parent/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Client": "mobile" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Couldn't send sign-in code");
+    parentOtpTempTokenRef.current = data.tempToken || null;
+    return data;
+  };
+
+  const verifyParentOtp = async (otp) => {
+    const response = await fetch(`${API_BASE_URL}/auth/parent/login/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Client": "mobile" },
+      body: JSON.stringify({ otp, tempToken: parentOtpTempTokenRef.current }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Invalid code");
+    parentOtpTempTokenRef.current = null;
+    await saveTokens(data.accessToken, data.refreshToken);
+    await saveUser(data.user);
+    setUser(data.user);
+    return data.user;
+  };
+
   const updateUser = async (patch) => {
     const updated = { ...user, ...patch };
     await saveUser(updated);
@@ -94,6 +127,8 @@ export const AuthProvider = ({ children }) => {
     supportLabel:  theme.supportLabel,
     supportsLabel: theme.supportsLabel,
     login,
+    requestParentOtp,
+    verifyParentOtp,
     logout,
     updateUser,
   };

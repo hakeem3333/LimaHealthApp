@@ -6,8 +6,11 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams, useNavigation } from "expo-router";
 import { useAuth } from "../contexts/AuthContext";
+import { ORG_THEMES, DEFAULT_THEME } from "../utils/orgTheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
+
+const ORG_KEYS = Object.keys(ORG_THEMES); // ["SCHOOL", "COMPANY", "HOSPITAL", "NGO"]
 
 // ── Light-mode design tokens ─────────────────────────────────────────────────
 const C = {
@@ -15,12 +18,6 @@ const C = {
   surface:     "#FFFFFF",
   border:      "#E2E8F0",
   borderFocus: "#CBD5E1",
-  teal:        "#0CAF87",   // Member login accent
-  tealLight:   "#EBF9F5",
-  tealGlow:    "rgba(12,175,135,0.15)",
-  purple:      "#6C5CE7",   // Counselor login accent
-  purpleLight: "#E9E6FE",
-  purpleGlow:  "rgba(108,92,231,0.12)",
   textPrimary: "#1B2A3B",
   textSecond:  "#5F6B7A",
   textMuted:   "#94A3B8",
@@ -29,7 +26,7 @@ const C = {
 export default function LoginScreen() {
   const router     = useRouter();
   const navigation = useNavigation();
-  const { role }   = useLocalSearchParams();
+  const { role, orgType } = useLocalSearchParams();
   const { login }  = useAuth();
 
   const [email,      setEmail]      = useState("");
@@ -41,11 +38,15 @@ export default function LoginScreen() {
 
   const isCounselor = role === "counselor";
 
-  // Color scheme switches based on who is logging in
-  const accent      = isCounselor ? C.purple : C.teal;
-  const accentLight = isCounselor ? C.purpleLight : C.tealLight;
-  const accentGlow  = isCounselor ? C.purpleGlow  : C.tealGlow;
-  const blobColor   = isCounselor ? "rgba(108,92,231,0.08)" : "rgba(12,175,135,0.08)";
+  // Org type is chosen up front on the landing page and passed in via route
+  // params — this screen just themes itself off of it.
+  const orgTheme = (ORG_KEYS.includes(orgType) ? ORG_THEMES[orgType] : null) || DEFAULT_THEME;
+
+  // Color scheme follows the selected organisation
+  const accent      = orgTheme.primary;
+  const accentLight = orgTheme.accent;
+  const accentGlow  = orgTheme.glow;
+  const blobColor   = orgTheme.glow;
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -97,11 +98,11 @@ export default function LoginScreen() {
                 color={accent}
               />
               <Text style={[styles.roleChipText, { color: accent }]}>
-                {isCounselor ? "Care Provider" : "Member"}
+                {isCounselor ? orgTheme.supportLabel : orgTheme.memberLabel}
               </Text>
             </View>
             <Text style={styles.title}>Welcome{"\n"}back</Text>
-            <Text style={styles.sub}>Sign in to your LimaHealth account</Text>
+            <Text style={styles.sub}>Sign in to your {orgTheme.orgLabel} LimaHealth account</Text>
           </View>
 
           {/* Form */}
@@ -188,7 +189,6 @@ export default function LoginScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      <Toast />
     </View>
   );
 }
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
 
-  header: { marginTop: 32, marginBottom: 36 },
+  header: { marginTop: 20, marginBottom: 36 },
   roleChip: {
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 12, paddingVertical: 6,

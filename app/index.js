@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   StyleSheet, Text, View, TouchableOpacity,
   SafeAreaView, StatusBar, Dimensions,
@@ -9,6 +9,20 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Svg, {
   Circle, Ellipse, Path, G, Line, Defs, RadialGradient, Stop,
 } from "react-native-svg";
+import { ORG_THEMES } from "../utils/orgTheme";
+
+const ORG_KEYS = Object.keys(ORG_THEMES); // ["SCHOOL", "COMPANY", "HOSPITAL", "NGO"]
+
+// The "Care Provider"-tier card/art needs a second colour that contrasts with
+// whichever org colour is driving the "Member"-tier side, so the two options
+// stay visually distinct no matter which org is picked (e.g. COMPANY's own
+// brand colour is the same purple the provider side used to be hardcoded to).
+const PROVIDER_ACCENTS = {
+  SCHOOL:   { primary: "#6C5CE7", light: "#EEE9FD", mid: "#D1C8F8" }, // purple
+  COMPANY:  { primary: "#0D3B7A", light: "#E6EDF7", mid: "#9FB6D9" }, // navy
+  HOSPITAL: { primary: "#0CAF87", light: "#E8F8F3", mid: "#C6EEE3" }, // teal
+  NGO:      { primary: "#0D3B7A", light: "#E6EDF7", mid: "#9FB6D9" }, // navy
+};
 
 const { width, height } = Dimensions.get("window");
 const CARD_SIZE = (width - 48 - 12) / 2;
@@ -31,7 +45,9 @@ const C = {
 };
 
 // ── Background SVG art ────────────────────────────────────────────────────────
-function BackgroundArt() {
+// colorA follows the selected org's brand colour; colorB is its paired
+// "Care Provider" contrast colour (see PROVIDER_ACCENTS above).
+function BackgroundArt({ colorA, colorB }) {
   return (
     <Svg
       width={width}
@@ -40,26 +56,26 @@ function BackgroundArt() {
       pointerEvents="none"
     >
       <Defs>
-        {/* Top-right teal blob */}
-        <RadialGradient id="blobTeal" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%"   stopColor="#0CAF87" stopOpacity="0.13" />
-          <Stop offset="100%" stopColor="#0CAF87" stopOpacity="0"    />
+        {/* Top-right blob */}
+        <RadialGradient id="blobA" cx="50%" cy="50%" r="50%">
+          <Stop offset="0%"   stopColor={colorA} stopOpacity="0.13" />
+          <Stop offset="100%" stopColor={colorA} stopOpacity="0"    />
         </RadialGradient>
-        {/* Bottom-left purple blob */}
-        <RadialGradient id="blobPurple" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%"   stopColor="#6C5CE7" stopOpacity="0.10" />
-          <Stop offset="100%" stopColor="#6C5CE7" stopOpacity="0"    />
+        {/* Bottom-left blob */}
+        <RadialGradient id="blobB" cx="50%" cy="50%" r="50%">
+          <Stop offset="0%"   stopColor={colorB} stopOpacity="0.10" />
+          <Stop offset="100%" stopColor={colorB} stopOpacity="0"    />
         </RadialGradient>
         {/* Centre ambient glow */}
         <RadialGradient id="blobCenter" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%"   stopColor="#0CAF87" stopOpacity="0.05" />
-          <Stop offset="100%" stopColor="#0CAF87" stopOpacity="0"    />
+          <Stop offset="0%"   stopColor={colorA} stopOpacity="0.05" />
+          <Stop offset="100%" stopColor={colorA} stopOpacity="0"    />
         </RadialGradient>
       </Defs>
 
       {/* ── Organic blobs ── */}
-      <Ellipse cx={width + 30} cy={-30}   rx={220} ry={200} fill="url(#blobTeal)"   />
-      <Ellipse cx={-60}        cy={height * 0.72} rx={180} ry={160} fill="url(#blobPurple)" />
+      <Ellipse cx={width + 30} cy={-30}   rx={220} ry={200} fill="url(#blobA)"   />
+      <Ellipse cx={-60}        cy={height * 0.72} rx={180} ry={160} fill="url(#blobB)" />
       <Ellipse cx={width / 2}  cy={height * 0.45} rx={160} ry={120} fill="url(#blobCenter)" />
 
       {/* ── Dot grid (top-right quadrant) ── */}
@@ -70,7 +86,7 @@ function BackgroundArt() {
             cx={width - 28 - col * 18}
             cy={60 + row * 18}
             r={1.6}
-            fill="#0CAF87"
+            fill={colorA}
             opacity={0.18}
           />
         ))
@@ -84,7 +100,7 @@ function BackgroundArt() {
             cx={16 + col * 18}
             cy={height * 0.78 + row * 18}
             r={1.6}
-            fill="#6C5CE7"
+            fill={colorB}
             opacity={0.15}
           />
         ))
@@ -100,7 +116,7 @@ function BackgroundArt() {
             L ${width * 0.37} ${height * 0.3 + 14}
             L ${width * 0.41} ${height * 0.3}
             L ${width}        ${height * 0.3}`}
-        stroke="#0CAF87"
+        stroke={colorA}
         strokeWidth={1.2}
         strokeOpacity={0.12}
         fill="none"
@@ -110,32 +126,32 @@ function BackgroundArt() {
 
       {/* ── Faint medical cross — top left ── */}
       <G opacity={0.08} transform={`translate(22, 130)`}>
-        <Line x1="0" y1="10" x2="20" y2="10" stroke="#0CAF87" strokeWidth={4} strokeLinecap="round" />
-        <Line x1="10" y1="0" x2="10" y2="20" stroke="#0CAF87" strokeWidth={4} strokeLinecap="round" />
+        <Line x1="0" y1="10" x2="20" y2="10" stroke={colorA} strokeWidth={4} strokeLinecap="round" />
+        <Line x1="10" y1="0" x2="10" y2="20" stroke={colorA} strokeWidth={4} strokeLinecap="round" />
       </G>
 
       {/* ── Faint medical cross — bottom right ── */}
       <G opacity={0.07} transform={`translate(${width - 44}, ${height * 0.68})`}>
-        <Line x1="0" y1="10" x2="20" y2="10" stroke="#6C5CE7" strokeWidth={4} strokeLinecap="round" />
-        <Line x1="10" y1="0" x2="10" y2="20" stroke="#6C5CE7" strokeWidth={4} strokeLinecap="round" />
+        <Line x1="0" y1="10" x2="20" y2="10" stroke={colorB} strokeWidth={4} strokeLinecap="round" />
+        <Line x1="10" y1="0" x2="10" y2="20" stroke={colorB} strokeWidth={4} strokeLinecap="round" />
       </G>
 
       {/* ── Floating ring accents ── */}
-      <Circle cx={width - 22}  cy={height * 0.52} r={28} stroke="#0CAF87" strokeWidth={1} strokeOpacity={0.1} fill="none" />
-      <Circle cx={width - 22}  cy={height * 0.52} r={18} stroke="#0CAF87" strokeWidth={1} strokeOpacity={0.07} fill="none" />
-      <Circle cx={32}          cy={height * 0.22} r={22} stroke="#6C5CE7" strokeWidth={1} strokeOpacity={0.1} fill="none" />
+      <Circle cx={width - 22}  cy={height * 0.52} r={28} stroke={colorA} strokeWidth={1} strokeOpacity={0.1} fill="none" />
+      <Circle cx={width - 22}  cy={height * 0.52} r={18} stroke={colorA} strokeWidth={1} strokeOpacity={0.07} fill="none" />
+      <Circle cx={32}          cy={height * 0.22} r={22} stroke={colorB} strokeWidth={1} strokeOpacity={0.1} fill="none" />
 
       {/* ── Tiny scattered health icons (as circles with inner dot) ── */}
-      <Circle cx={width * 0.14} cy={height * 0.12} r={3.5} fill="#0CAF87" opacity={0.14} />
-      <Circle cx={width * 0.88} cy={height * 0.18} r={2.5} fill="#6C5CE7" opacity={0.13} />
-      <Circle cx={width * 0.08} cy={height * 0.58} r={4}   fill="#0CAF87" opacity={0.10} />
-      <Circle cx={width * 0.94} cy={height * 0.65} r={3}   fill="#6C5CE7" opacity={0.11} />
-      <Circle cx={width * 0.50} cy={height * 0.08} r={2.5} fill="#0CAF87" opacity={0.10} />
+      <Circle cx={width * 0.14} cy={height * 0.12} r={3.5} fill={colorA} opacity={0.14} />
+      <Circle cx={width * 0.88} cy={height * 0.18} r={2.5} fill={colorB} opacity={0.13} />
+      <Circle cx={width * 0.08} cy={height * 0.58} r={4}   fill={colorA} opacity={0.10} />
+      <Circle cx={width * 0.94} cy={height * 0.65} r={3}   fill={colorB} opacity={0.11} />
+      <Circle cx={width * 0.50} cy={height * 0.08} r={2.5} fill={colorA} opacity={0.10} />
 
       {/* ── Bottom arc ── */}
       <Path
         d={`M 0 ${height} Q ${width / 2} ${height * 0.88} ${width} ${height}`}
-        fill="#0CAF87"
+        fill={colorA}
         opacity={0.04}
       />
     </Svg>
@@ -146,23 +162,56 @@ function BackgroundArt() {
 export default function LimaLanding() {
   const router = useRouter();
 
+  const [orgIndex, setOrgIndex] = useState(0);
+  const orgKey       = ORG_KEYS[orgIndex];
+  const orgTheme     = ORG_THEMES[orgKey];
+  const providerTheme = PROVIDER_ACCENTS[orgKey];
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
       {/* SVG background art — rendered absolutely behind everything */}
-      <BackgroundArt />
+      <BackgroundArt colorA={orgTheme.primary} colorB={providerTheme.primary} />
 
       <SafeAreaView style={styles.safe}>
 
         {/* ── Logo ── */}
         <View style={styles.logoRow}>
-          <View style={styles.logoMark}>
+          <View style={[styles.logoMark, { backgroundColor: orgTheme.primary }]}>
             <MaterialCommunityIcons name="pulse" size={16} color="#FFF" />
           </View>
           <Text style={styles.logoText}>
-            Lima<Text style={{ color: C.teal }}>Health</Text>
+            Lima<Text style={{ color: orgTheme.primary }}>Health</Text>
           </Text>
+        </View>
+
+        {/* ── Org type picker ── */}
+        <View style={styles.orgSwitcherWrap}>
+          <View style={styles.orgSwitcher}>
+            {ORG_KEYS.map((key, i) => {
+              const t = ORG_THEMES[key];
+              const active = i === orgIndex;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => setOrgIndex(i)}
+                  style={[
+                    styles.orgSwitcherBtn,
+                    active && { backgroundColor: t.primary, shadowColor: t.primary },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={t.icon}
+                    size={16}
+                    color={active ? "#FFF" : C.textMuted}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.orgSwitcherLabel}>Pick your organisation type</Text>
+          <Text style={[styles.orgSwitcherName, { color: orgTheme.primary }]}>{orgTheme.orgLabel}</Text>
         </View>
 
         {/* ── Headline ── */}
@@ -178,28 +227,28 @@ export default function LimaLanding() {
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.82}
-            onPress={() => router.push({ pathname: "/login", params: { role: "member" } })}
+            onPress={() => router.push({ pathname: "/login", params: { role: "member", orgType: ORG_KEYS[orgIndex] } })}
           >
             <LinearGradient
-              colors={[C.tealLight, C.tealMid]}
+              colors={[orgTheme.accent, orgTheme.secondary]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.cardIllustration}
             >
               {/* Mini SVG inside card illustration */}
               <Svg width={CARD_SIZE} height={CARD_SIZE} style={StyleSheet.absoluteFill} pointerEvents="none">
-                <Circle cx={CARD_SIZE * 0.85} cy={CARD_SIZE * 0.15} r={30} fill="#0CAF87" opacity={0.12} />
-                <Circle cx={CARD_SIZE * 0.1}  cy={CARD_SIZE * 0.82} r={20} fill="#0CAF87" opacity={0.08} />
+                <Circle cx={CARD_SIZE * 0.85} cy={CARD_SIZE * 0.15} r={30} fill={orgTheme.primary} opacity={0.12} />
+                <Circle cx={CARD_SIZE * 0.1}  cy={CARD_SIZE * 0.82} r={20} fill={orgTheme.primary} opacity={0.08} />
                 <Path
                   d={`M 0 ${CARD_SIZE * 0.6} Q ${CARD_SIZE * 0.5} ${CARD_SIZE * 0.4} ${CARD_SIZE} ${CARD_SIZE * 0.6}`}
-                  fill="#0CAF87" opacity={0.07}
+                  fill={orgTheme.primary} opacity={0.07}
                 />
               </Svg>
-              <MaterialCommunityIcons name="account-heart-outline" size={48} color={C.teal} />
+              <MaterialCommunityIcons name="account-heart-outline" size={48} color={orgTheme.primary} />
             </LinearGradient>
             <View style={styles.cardLabel}>
               <View style={styles.cardTitleRow}>
-                <Text style={styles.cardTitle}>Member</Text>
-                <Text style={[styles.cardArrow, { color: C.teal }]}> →</Text>
+                <Text style={styles.cardTitle}>{orgTheme.memberLabel}</Text>
+                <Text style={[styles.cardArrow, { color: orgTheme.primary }]}> →</Text>
               </View>
               <Text style={styles.cardDesc}>Track vitals & book support</Text>
             </View>
@@ -209,27 +258,27 @@ export default function LimaLanding() {
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.82}
-            onPress={() => router.push({ pathname: "/login", params: { role: "counselor" } })}
+            onPress={() => router.push({ pathname: "/login", params: { role: "counselor", orgType: ORG_KEYS[orgIndex] } })}
           >
             <LinearGradient
-              colors={[C.purpleLight, C.purpleMid]}
+              colors={[providerTheme.light, providerTheme.mid]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.cardIllustration}
             >
               <Svg width={CARD_SIZE} height={CARD_SIZE} style={StyleSheet.absoluteFill} pointerEvents="none">
-                <Circle cx={CARD_SIZE * 0.12} cy={CARD_SIZE * 0.15} r={28} fill="#6C5CE7" opacity={0.12} />
-                <Circle cx={CARD_SIZE * 0.88} cy={CARD_SIZE * 0.80} r={18} fill="#6C5CE7" opacity={0.08} />
+                <Circle cx={CARD_SIZE * 0.12} cy={CARD_SIZE * 0.15} r={28} fill={providerTheme.primary} opacity={0.12} />
+                <Circle cx={CARD_SIZE * 0.88} cy={CARD_SIZE * 0.80} r={18} fill={providerTheme.primary} opacity={0.08} />
                 <Path
                   d={`M 0 ${CARD_SIZE * 0.65} Q ${CARD_SIZE * 0.5} ${CARD_SIZE * 0.45} ${CARD_SIZE} ${CARD_SIZE * 0.65}`}
-                  fill="#6C5CE7" opacity={0.07}
+                  fill={providerTheme.primary} opacity={0.07}
                 />
               </Svg>
-              <MaterialCommunityIcons name="stethoscope" size={48} color={C.purple} />
+              <MaterialCommunityIcons name="stethoscope" size={48} color={providerTheme.primary} />
             </LinearGradient>
             <View style={styles.cardLabel}>
               <View style={styles.cardTitleRow}>
-                <Text style={styles.cardTitle}>Care Provider</Text>
-                <Text style={[styles.cardArrow, { color: C.purple }]}> →</Text>
+                <Text style={styles.cardTitle}>{orgTheme.supportLabel}</Text>
+                <Text style={[styles.cardArrow, { color: providerTheme.primary }]}> →</Text>
               </View>
               <Text style={styles.cardDesc}>Insights & sessions</Text>
             </View>
@@ -257,7 +306,7 @@ export default function LimaLanding() {
         <View style={styles.footer}>
           <View style={styles.footerDivider} />
           <View style={styles.footerInner}>
-            <View style={styles.footerLogoMark}>
+            <View style={[styles.footerLogoMark, { backgroundColor: orgTheme.primary }]}>
               <MaterialCommunityIcons name="pulse" size={11} color="#FFF" />
             </View>
             <Text style={styles.footerBrand}>LimaHealth</Text>
@@ -287,7 +336,27 @@ const styles = StyleSheet.create({
   },
   logoText: { fontSize: 16, fontWeight: "800", color: C.textPrimary, letterSpacing: 0.2 },
 
-  headline: { marginTop: 52, marginBottom: 40, alignItems: "center" },
+  orgSwitcherWrap: { alignItems: "center", marginTop: 28 },
+  orgSwitcher: {
+    flexDirection: "row", gap: 4, padding: 4,
+    backgroundColor: C.bg, borderRadius: 16,
+    borderWidth: 1, borderColor: C.border,
+  },
+  orgSwitcherBtn: {
+    width: 34, height: 34, borderRadius: 12,
+    justifyContent: "center", alignItems: "center",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25, shadowRadius: 6, elevation: 3,
+  },
+  orgSwitcherLabel: {
+    fontSize: 10, fontWeight: "700", textTransform: "uppercase",
+    letterSpacing: 0.4, marginTop: 8, color: C.textMuted,
+  },
+  orgSwitcherName: {
+    fontSize: 13, fontWeight: "800", marginTop: 2,
+  },
+
+  headline: { marginTop: 28, marginBottom: 40, alignItems: "center" },
   welcome: { fontSize: 26, fontWeight: "800", color: C.textPrimary, textAlign: "center", letterSpacing: -0.4 },
   sub: { fontSize: 16, color: C.textSecond, marginTop: 8, textAlign: "center" },
 

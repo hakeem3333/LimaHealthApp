@@ -8,6 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemedStyles } from "../contexts/ThemeContext";
 
 /**
  * FitbitOnboardingModal Component
@@ -16,12 +17,14 @@ import { Ionicons } from "@expo/vector-icons";
  * @param {function} onConnect - Function passed from parent to start OAuth flow
  */
 const FitbitOnboardingModal = ({ isVisible, onClose, onConnect }) => {
+  const { styles } = useThemedStyles(createStyles);
   return (
     <Modal
       visible={isVisible}
       transparent={true}
       animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       {/* 1. Backdrop: Deep navy/purple overlay */}
       <Pressable style={styles.overlay} onPress={onClose}>
@@ -80,7 +83,7 @@ const FitbitOnboardingModal = ({ isVisible, onClose, onConnect }) => {
             style={styles.skipBtn}
             onPress={onClose}
           >
-            <Text style={styles.skipText}>I'll do this later</Text>
+            <Text style={styles.skipText}>I&apos;ll do this later</Text>
           </TouchableOpacity>
 
           {/* Trust Footer */}
@@ -98,14 +101,14 @@ const FitbitOnboardingModal = ({ isVisible, onClose, onConnect }) => {
 
 export default FitbitOnboardingModal;
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(30, 27, 75, 0.85)",
+    backgroundColor: BASE.overlay,
     justifyContent: "flex-end",
   },
   modalContainer: {
-    backgroundColor: "#FFF",
+    backgroundColor: BASE.surface,
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     padding: 30,
@@ -118,7 +121,7 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 80,
     height: 80,
-    backgroundColor: "#F3E8FF",
+    backgroundColor: "#6D28D9" + "22",
     borderRadius: 40,
     justifyContent: "center",
     alignItems: "center",
@@ -128,12 +131,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#2E1065",
+    color: BASE.textPrimary,
     textAlign: "center",
   },
   description: {
     fontSize: 16,
-    color: "#6B7280",
+    color: BASE.textSecondary,
     textAlign: "center",
     lineHeight: 24,
     marginTop: 12,
@@ -141,7 +144,7 @@ const styles = StyleSheet.create({
   },
   featureBox: {
     width: "100%",
-    backgroundColor: "#FAF5FF",
+    backgroundColor: BASE.surfaceAlt,
     borderRadius: 20,
     padding: 16,
     marginBottom: 30,
@@ -154,7 +157,7 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#4C1D95",
+    color: BASE.textPrimary,
     marginLeft: 12,
   },
   connectBtn: {

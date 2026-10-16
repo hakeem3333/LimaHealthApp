@@ -10,7 +10,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 // Matches the SEVERITY_STYLE palette used on Caseload/Alerts — kept as its
 // own literal scale rather than BASE tokens since risk severity is a
@@ -23,6 +23,7 @@ const SEVERITY_STYLE = {
 };
 
 export default function CounselorDashboard() {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const router   = useRouter();
   const { user, theme, supportLabel, membersLabel } = useAuth();
   const accent = theme?.primary ?? BASE.success;
@@ -224,7 +225,7 @@ export default function CounselorDashboard() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container:        { flex: 1, backgroundColor: BASE.bg },
   center:           { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BASE.bg },
   header:           { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, paddingTop: 10 },

@@ -10,6 +10,10 @@ import * as SecureStore from "expo-secure-store";
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
+// Server origin (no /api/v1 suffix) — for resolving relative asset URLs
+// such as profile images returned by the API.
+export const API_ORIGIN = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
+
 const MOBILE_HEADERS = {
   "Content-Type": "application/json",
   "X-Client": "mobile",
@@ -99,8 +103,12 @@ const refreshAccessToken = async () => {
 export const apiFetch = async (endpoint, options = {}, retry = true) => {
   const token = await getAccessToken();
 
+  // FormData (file uploads) must let fetch set its own multipart boundary,
+  // so skip the default JSON content-type in that case.
+  const isFormData = options.body instanceof FormData;
+
   const headers = {
-    ...MOBILE_HEADERS,
+    ...(isFormData ? { "X-Client": MOBILE_HEADERS["X-Client"] } : MOBILE_HEADERS),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };

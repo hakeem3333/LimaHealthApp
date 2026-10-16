@@ -84,7 +84,7 @@ export default function ChangePasswordScreen() {
             </View>
             <Text style={styles.title}>Set a new{"\n"}password</Text>
             <Text style={styles.sub}>
-              You're using a temporary password. Choose a new one to continue.
+              You&apos;re using a temporary password. Choose a new one to continue.
             </Text>
           </View>
 
@@ -143,7 +143,6 @@ export default function ChangePasswordScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      <Toast />
     </View>
   );
 }

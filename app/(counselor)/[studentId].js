@@ -18,7 +18,7 @@ import Toast from "react-native-toast-message";
 
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 // Kept as its own literal scale, matching Caseload/Alerts — risk severity is
 // a semantic domain independent of org branding, not a BASE token.
@@ -30,6 +30,7 @@ const SEVERITY_STYLE = {
 };
 
 export default function StudentDeepDive() {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const { studentId } = useLocalSearchParams();
   const router = useRouter();
   const { memberLabel, theme } = useAuth();
@@ -303,12 +304,11 @@ export default function StudentDeepDive() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </SafeAreaView>
-      <Toast />
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container: { flex: 1, backgroundColor: BASE.bg, paddingHorizontal: 20 },
   center: { justifyContent: "center", alignItems: "center" },
   emptyText: { color: BASE.textSecondary, fontSize: 14, marginBottom: 16 },

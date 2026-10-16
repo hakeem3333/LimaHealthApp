@@ -18,6 +18,7 @@ import Toast from "react-native-toast-message";
 
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 function getNextWeekdays(count = 6) {
   const days = [];
@@ -37,6 +38,7 @@ export default function ScheduleSession() {
   const router = useRouter();
   const { studentId, studentName } = useLocalSearchParams();
   const { memberLabel } = useAuth();
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
 
   const [mode, setMode] = useState("defined"); // "defined" | "options"
   const [slots, setSlots] = useState([emptySlot()]);
@@ -111,7 +113,7 @@ export default function ScheduleSession() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backCircle}>
-          <MaterialCommunityIcons name="chevron-left" size={28} color="#F8FAFC" />
+          <MaterialCommunityIcons name="chevron-left" size={28} color={BASE.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerTextWrap}>
           <Text style={styles.title}>Schedule Session</Text>
@@ -159,7 +161,7 @@ export default function ScheduleSession() {
                 </View>
                 {mode === "options" && i === 2 && (
                   <TouchableOpacity onPress={removeThirdOption} hitSlop={8}>
-                    <MaterialCommunityIcons name="close-circle-outline" size={18} color="#64748B" />
+                    <MaterialCommunityIcons name="close-circle-outline" size={18} color={BASE.textMuted} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -217,7 +219,7 @@ export default function ScheduleSession() {
           <TextInput
             style={styles.reasonInput}
             placeholder="e.g. Weekly check-in"
-            placeholderTextColor="#475569"
+            placeholderTextColor={BASE.textMuted}
             value={reason}
             onChangeText={setReason}
             multiline
@@ -248,12 +250,12 @@ export default function ScheduleSession() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
-      <Toast />
     </SafeAreaView>
   );
 }
 
 function ModeCard({ active, icon, title, desc, onPress }) {
+  const { styles } = useThemedStyles(createStyles);
   return (
     <TouchableOpacity
       style={[styles.modeCard, active && styles.modeCardActive]}
@@ -269,25 +271,25 @@ function ModeCard({ active, icon, title, desc, onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#020617", paddingHorizontal: 20 },
+const createStyles = (BASE) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: BASE.bg, paddingHorizontal: 20 },
 
   header: { flexDirection: "row", alignItems: "center", marginVertical: 20 },
-  backCircle: { backgroundColor: "#1E293B", padding: 8, borderRadius: 12 },
+  backCircle: { backgroundColor: BASE.surfaceAlt, padding: 8, borderRadius: 12 },
   headerTextWrap: { flex: 1, marginLeft: 15 },
-  title: { color: "#F8FAFC", fontSize: 20, fontWeight: "800" },
-  subtitle: { color: "#64748B", fontSize: 12, marginTop: 2 },
+  title: { color: BASE.textPrimary, fontSize: 20, fontWeight: "800" },
+  subtitle: { color: BASE.textMuted, fontSize: 12, marginTop: 2 },
 
   modeRow: { flexDirection: "row", gap: 10, marginBottom: 24 },
   modeCard: {
     flex: 1,
-    backgroundColor: "#0F172A",
+    backgroundColor: BASE.surface,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: "#1E293B",
+    borderColor: BASE.border,
   },
-  modeCardActive: { borderColor: "#8B5CF6", backgroundColor: "#1E1035" },
+  modeCardActive: { borderColor: "#8B5CF6", backgroundColor: "rgba(139, 92, 246, 0.12)" },
   modeIconWrap: {
     width: 36,
     height: 36,
@@ -298,17 +300,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   modeIconWrapActive: { backgroundColor: "#8B5CF6" },
-  modeTitle: { color: "#94A3B8", fontSize: 14, fontWeight: "800", marginBottom: 4 },
-  modeTitleActive: { color: "#F8FAFC" },
-  modeDesc: { color: "#64748B", fontSize: 11, lineHeight: 15 },
+  modeTitle: { color: BASE.textSecondary, fontSize: 14, fontWeight: "800", marginBottom: 4 },
+  modeTitleActive: { color: BASE.textPrimary },
+  modeDesc: { color: BASE.textMuted, fontSize: 11, lineHeight: 15 },
 
   slotBlock: {
-    backgroundColor: "#0F172A",
+    backgroundColor: BASE.surface,
     borderRadius: 20,
     paddingVertical: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#1E293B",
+    borderColor: BASE.border,
   },
   slotHeader: {
     flexDirection: "row",
@@ -327,22 +329,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   slotIndexText: { color: "#8B5CF6", fontSize: 11, fontWeight: "800" },
-  slotLabel: { color: "#94A3B8", fontSize: 13, fontWeight: "700" },
+  slotLabel: { color: BASE.textSecondary, fontSize: 13, fontWeight: "700" },
 
   dateRow: { paddingHorizontal: 16 },
   dateCard: {
     alignItems: "center",
-    backgroundColor: "#1B2A3B",
+    backgroundColor: BASE.surfaceAlt,
     borderRadius: 14,
     padding: 12,
     marginRight: 8,
     minWidth: 52,
     borderWidth: 1,
-    borderColor: "#1E293B",
+    borderColor: BASE.border,
   },
   selectedDateCard: { backgroundColor: "#8B5CF6", borderColor: "#8B5CF6" },
-  dayText: { color: "#64748B", fontSize: 11, fontWeight: "600" },
-  dateNum: { color: "#F8FAFC", fontSize: 16, fontWeight: "800", marginTop: 3 },
+  dayText: { color: BASE.textMuted, fontSize: 11, fontWeight: "600" },
+  dateNum: { color: BASE.textPrimary, fontSize: 16, fontWeight: "800", marginTop: 3 },
   selectedText: { color: "#FFF" },
 
   timeGrid: {
@@ -355,13 +357,13 @@ const styles = StyleSheet.create({
   timeChip: {
     paddingHorizontal: 16,
     paddingVertical: 9,
-    backgroundColor: "#1B2A3B",
+    backgroundColor: BASE.surfaceAlt,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#1E293B",
+    borderColor: BASE.border,
   },
   selectedTimeChip: { backgroundColor: "#8B5CF6", borderColor: "#8B5CF6" },
-  timeChipText: { color: "#94A3B8", fontSize: 13, fontWeight: "600" },
+  timeChipText: { color: BASE.textSecondary, fontSize: 13, fontWeight: "600" },
 
   addOptionBtn: {
     flexDirection: "row",
@@ -374,18 +376,18 @@ const styles = StyleSheet.create({
   addOptionText: { color: "#8B5CF6", fontSize: 13, fontWeight: "700" },
 
   label: {
-    color: "#94A3B8",
+    color: BASE.textSecondary,
     fontSize: 13,
     fontWeight: "700",
     marginBottom: 10,
     marginTop: 4,
   },
   reasonInput: {
-    backgroundColor: "#0F172A",
+    backgroundColor: BASE.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#1E293B",
-    color: "#F8FAFC",
+    borderColor: BASE.border,
+    color: BASE.textPrimary,
     fontSize: 14,
     padding: 14,
     minHeight: 60,

@@ -11,7 +11,7 @@ import Toast from "react-native-toast-message";
 
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 function timeAgo(dateStr) {
   const seconds = Math.floor((Date.now() - new Date(dateStr)) / 1000);
@@ -23,6 +23,7 @@ function timeAgo(dateStr) {
 }
 
 export default function CounselorNotes() {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const router = useRouter();
   const { theme, memberLabel, membersLabel } = useAuth();
 
@@ -143,7 +144,7 @@ export default function CounselorNotes() {
         )}
       />
 
-      <Modal visible={composerOpen} transparent animationType="slide" onRequestClose={() => setComposerOpen(false)}>
+      <Modal visible={composerOpen} transparent animationType="slide" onRequestClose={() => setComposerOpen(false)} statusBarTranslucent>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.modalWrap}
@@ -211,7 +212,7 @@ export default function CounselorNotes() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container: { flex: 1, backgroundColor: BASE.bg },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BASE.bg },
 
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
   emptyText: { color: BASE.textMuted, fontSize: 13, textAlign: "center", lineHeight: 19 },
 
   modalWrap: { flex: 1, justifyContent: "flex-end" },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: BASE.overlay },
   sheet: {
     backgroundColor: BASE.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, paddingBottom: 32, borderWidth: 1, borderColor: BASE.border,

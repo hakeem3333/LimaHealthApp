@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView,
   TextInput, TouchableOpacity, ActivityIndicator,
-  RefreshControl, Dimensions,
+  RefreshControl, Animated, PanResponder,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch } from "../../api/client";
-import { BASE } from "../../utils/orgTheme";
-
-const { width } = Dimensions.get("window");
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 const MOODS = [
   { icon: "emoticon-excited", label: "Great", value: "GREAT", color: "#10B981" },
@@ -22,8 +20,127 @@ const MOODS = [
 
 const MOOD_COLOR = { GREAT: "#10B981", GOOD: "#818CF8", OKAY: "#F59E0B", LOW: "#EF4444", AWFUL: "#DC2626" };
 
+const THUMB_SIZE = 54;
+
+function MoodSlider({ value, onChange }) {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const trackRef = useRef(null);
+  const trackPageX = useRef(0);
+  const anim = useRef(new Animated.Value(2)).current;
+  const [liveIndex, setLiveIndex] = useState(
+    value ? Math.max(MOODS.findIndex((m) => m.value === value), 0) : 2
+  );
+  const [touched, setTouched] = useState(!!value);
+
+  const usable = Math.max(trackWidth - THUMB_SIZE, 1);
+
+  const indexFromPageX = (pageX) => {
+    const localX = pageX - trackPageX.current - THUMB_SIZE / 2;
+    const clamped = Math.min(Math.max(localX, 0), usable);
+    return (clamped / usable) * (MOODS.length - 1);
+  };
+
+  const commit = (idx) => {
+    const rounded = Math.round(Math.min(Math.max(idx, 0), MOODS.length - 1));
+    Animated.spring(anim, { toValue: rounded, useNativeDriver: false, friction: 7, tension: 60 }).start();
+    setLiveIndex(rounded);
+    setTouched(true);
+    onChange(MOODS[rounded].value);
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        setTouched(true);
+        const idx = indexFromPageX(evt.nativeEvent.pageX);
+        anim.setValue(idx);
+        setLiveIndex(Math.round(idx));
+      },
+      onPanResponderMove: (_evt, gesture) => {
+        const idx = indexFromPageX(gesture.moveX);
+        anim.setValue(idx);
+        const rounded = Math.round(idx);
+        setLiveIndex((prev) => (prev !== rounded ? rounded : prev));
+      },
+      onPanResponderRelease: () => {
+        anim.stopAnimation((current) => commit(current));
+      },
+      onPanResponderTerminate: () => {
+        anim.stopAnimation((current) => commit(current));
+      },
+    })
+  ).current;
+
+  const translateX = anim.interpolate({
+    inputRange: [0, MOODS.length - 1],
+    outputRange: [0, usable],
+    extrapolate: "clamp",
+  });
+  const bgColor = anim.interpolate({
+    inputRange: MOODS.map((_, i) => i),
+    outputRange: MOODS.map((m) => m.color),
+  });
+
+  const activeMood = MOODS[liveIndex];
+
+  return (
+    <View style={styles.sliderWrap}>
+      <View
+        ref={trackRef}
+        style={styles.sliderTrack}
+        onLayout={(e) => {
+          setTrackWidth(e.nativeEvent.layout.width);
+          requestAnimationFrame(() => {
+            trackRef.current?.measure?.((x, y, w, h, pageX) => { trackPageX.current = pageX; });
+          });
+        }}
+        {...panResponder.panHandlers}
+      >
+        <View style={styles.sliderTrackBg} />
+        {trackWidth > 0 && (
+          <Animated.View
+            style={[
+              styles.sliderThumb,
+              {
+                transform: [{ translateX }],
+                backgroundColor: touched ? bgColor : BASE.border,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={activeMood.icon}
+              size={28}
+              color={touched ? "#fff" : BASE.textMuted}
+            />
+          </Animated.View>
+        )}
+      </View>
+      <View style={styles.sliderLabels}>
+        {MOODS.map((m, i) => {
+          const active = touched && i === liveIndex;
+          return (
+            <TouchableOpacity
+              key={m.value}
+              style={styles.sliderLabelHit}
+              onPress={() => commit(i)}
+            >
+              <Text style={[styles.sliderLabelText, active && { color: m.color, fontWeight: "800" }]}>
+                {m.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function MoodScreen() {
   const { user, theme } = useAuth();
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const [selected,  setSelected]  = useState(null);
   const [note,      setNote]      = useState("");
   const [history,   setHistory]   = useState([]);
@@ -75,25 +192,11 @@ export default function MoodScreen() {
       </View>
 
       {/* MOOD PICKER */}
-      <View style={styles.moodRow}>
-        {MOODS.map((m) => {
-          const active = selected === m.value;
-          return (
-            <TouchableOpacity
-              key={m.value}
-              onPress={() => setSelected(m.value)}
-              style={[styles.moodCard, active && { borderColor: m.color, backgroundColor: m.color + "12" }]}
-            >
-              <MaterialCommunityIcons name={m.icon} size={30} color={active ? m.color : BASE.textMuted} />
-              <Text style={[styles.moodLabel, active && { color: m.color }]}>{m.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <MoodSlider value={selected} onChange={setSelected} />
 
       {/* NOTES */}
       <View style={[styles.card, noteFocus && { borderColor: theme.primary }]}>
-        <Text style={styles.cardLabel}>What's on your mind?</Text>
+        <Text style={styles.cardLabel}>What&apos;s on your mind?</Text>
         <TextInput
           style={styles.textArea}
           placeholder="Optional — write freely..."
@@ -169,25 +272,34 @@ export default function MoodScreen() {
       )}
 
       <View style={{ height: 40 }} />
-      <Toast />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container: { flex: 1, backgroundColor: BASE.bg, paddingHorizontal: 20 },
   header:    { marginTop: 60, marginBottom: 24 },
   title:     { color: BASE.textPrimary, fontSize: 28, fontWeight: "800" },
   sub:       { color: BASE.textMuted,   fontSize: 15, marginTop: 4 },
 
-  moodRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
-  moodCard: {
-    width: (width - 60) / 5, paddingVertical: 14,
-    alignItems: "center", borderRadius: 18,
-    borderWidth: 1, borderColor: BASE.border,
-    backgroundColor: BASE.surface,
+  sliderWrap: { marginBottom: 22 },
+  sliderTrack: { height: THUMB_SIZE, justifyContent: "center" },
+  sliderTrackBg: {
+    position: "absolute",
+    left: THUMB_SIZE / 2, right: THUMB_SIZE / 2,
+    height: 8, borderRadius: 4,
+    backgroundColor: BASE.border,
   },
-  moodLabel: { color: BASE.textMuted, fontSize: 9, fontWeight: "700", marginTop: 7 },
+  sliderThumb: {
+    position: "absolute", top: 0, left: 0,
+    width: THUMB_SIZE, height: THUMB_SIZE, borderRadius: THUMB_SIZE / 2,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  sliderLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
+  sliderLabelHit: { flex: 1, alignItems: "center", paddingVertical: 4 },
+  sliderLabelText: { color: BASE.textMuted, fontSize: 11, fontWeight: "600" },
 
   card: {
     backgroundColor: BASE.surface, borderRadius: 22,

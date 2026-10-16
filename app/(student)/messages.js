@@ -7,19 +7,27 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import Toast from "react-native-toast-message";
 
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 const POLL_INTERVAL_MS = 4000;
 
 export default function StudentMessages() {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const router = useRouter();
   const { user, theme, supportLabel } = useAuth();
   const listRef = useRef(null);
   const pollRef = useRef(null);
   const counselorRef = useRef(null);
+  // Each thread fetch gets a sequence number; a response is applied only if
+  // it's newer than the last one applied. A successful send raises that floor
+  // past every fetch already in flight, so a stale poll can't drop the
+  // just-sent message from the list.
+  const fetchSeqRef = useRef(0);
+  const appliedSeqRef = useRef(0);
 
   const [counselor, setCounselor] = useState(null);
   const [messages, setMessages]   = useState([]);
@@ -40,7 +48,10 @@ export default function StudentMessages() {
         setCounselor({ id: convo.userId, name: convo.name });
       }
 
+      const seq = ++fetchSeqRef.current;
       const res = await apiFetch(`/messages/${counselorRef.current}`);
+      if (seq <= appliedSeqRef.current) return;
+      appliedSeqRef.current = seq;
       setMessages(res.data?.messages || []);
     } catch (err) {
       console.error("Thread fetch error:", err.message);
@@ -68,10 +79,12 @@ export default function StudentMessages() {
         method: "POST",
         body: JSON.stringify({ recipientId: counselorRef.current, content }),
       });
+      appliedSeqRef.current = fetchSeqRef.current;
       setMessages((prev) => [...prev, res.data]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (err) {
       console.error("Send message error:", err.message);
+      Toast.show({ type: "error", text1: "Message not sent", text2: err?.data?.error || err.message });
       setDraft(content);
     } finally {
       setSending(false);
@@ -184,7 +197,7 @@ export default function StudentMessages() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container: { flex: 1, backgroundColor: BASE.bg },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BASE.bg },
 

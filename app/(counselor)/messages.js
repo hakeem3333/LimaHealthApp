@@ -9,7 +9,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 function timeAgo(dateStr) {
   if (!dateStr) return "";
@@ -24,6 +24,7 @@ function timeAgo(dateStr) {
 export default function CounselorMessages() {
   const router = useRouter();
   const { theme, memberLabel } = useAuth();
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
 
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -111,7 +112,7 @@ export default function CounselorMessages() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container: { flex: 1, backgroundColor: BASE.bg },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BASE.bg },
 

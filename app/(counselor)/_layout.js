@@ -4,11 +4,12 @@ import { useAuth } from "../../contexts/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { View, ActivityIndicator } from "react-native";
 import { apiFetch } from "../../api/client";
-import { BASE } from "../../utils/orgTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const ALERT_POLL_INTERVAL_MS = 30000;
 
 export default function CounselorLayout() {
+  const { colors: BASE } = useTheme();
   const { user, isCounselor, loading, theme } = useAuth();
   const [unresolvedAlerts, setUnresolvedAlerts] = useState(0);
 
@@ -163,6 +164,15 @@ export default function CounselorLayout() {
       {/* Hidden route — weekly working hours, triggered from Sessions */}
       <Tabs.Screen
         name="availability"
+        options={{
+          href: null,
+          tabBarStyle: { display: "none" },
+        }}
+      />
+
+      {/* Hidden route — time off (blocked dates), triggered from Weekly Hours */}
+      <Tabs.Screen
+        name="time-off"
         options={{
           href: null,
           tabBarStyle: { display: "none" },

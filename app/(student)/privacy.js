@@ -7,11 +7,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch } from "../../api/client";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
+import { confirmAction, showMessage } from "../../utils/confirm";
 
 export default function PrivacyScreen() {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const { user, theme, memberLabel } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [fitbitLinked, setFitbitLinked] = useState(false);
   const [consent, setConsent] = useState({
     shareHeartRate: true,
     shareSleep:     true,
@@ -28,6 +32,34 @@ export default function PrivacyScreen() {
       .catch(() => {});
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    apiFetch(`/fitbit/status/${user.id}`)
+      .then((data) => setFitbitLinked(!!data?.isLinked))
+      .catch(() => {});
+  }, [user?.id]);
+
+  const handleDisconnectFitbit = () => {
+    confirmAction({
+      title: "Disconnect Fitbit",
+      message: "Your counselor will no longer receive new heart rate, sleep, or activity data from Fitbit. Previously shared records are not deleted.",
+      confirmText: "Disconnect",
+      destructive: true,
+      onConfirm: async () => {
+        setDisconnecting(true);
+        try {
+          await apiFetch("/fitbit/disconnect", { method: "DELETE" });
+          setFitbitLinked(false);
+          Toast.show({ type: "success", text1: "Fitbit disconnected" });
+        } catch (err) {
+          Toast.show({ type: "error", text1: "Couldn't disconnect", text2: err.message });
+        } finally {
+          setDisconnecting(false);
+        }
+      },
+    });
+  };
+
   const toggle = async (key) => {
     const updated = { ...consent, [key]: !consent[key] };
     setConsent(updated);
@@ -41,7 +73,7 @@ export default function PrivacyScreen() {
   };
 
   const handleExport = () => {
-    Alert.alert("Data Export Requested", "A secure download link will be sent to your registered email address within a few minutes.", [{ text: "OK" }]);
+    showMessage("Data Export Requested", "A secure download link will be sent to your registered email address within a few minutes.");
   };
 
   const handleDeleteAccount = () => {
@@ -126,6 +158,24 @@ export default function PrivacyScreen() {
       {/* ACTIONS */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Data Actions</Text>
+        {fitbitLinked && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.deleteBtn]}
+            onPress={handleDisconnectFitbit}
+            disabled={disconnecting}
+          >
+            {disconnecting ? (
+              <ActivityIndicator size="small" color={BASE.error} />
+            ) : (
+              <MaterialCommunityIcons name="watch-variant" size={22} color={BASE.error} />
+            )}
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={[styles.actionTitle, { color: BASE.error }]}>Disconnect Fitbit</Text>
+              <Text style={styles.actionSub}>Stop sharing new heart rate, sleep & activity data</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color={BASE.error + "80"} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.actionBtn} onPress={handleExport}>
           <MaterialCommunityIcons name="download-circle-outline" size={22} color={theme.primary} />
           <View style={{ flex: 1, marginLeft: 14 }}>
@@ -152,12 +202,11 @@ export default function PrivacyScreen() {
       </View>
 
       <View style={{ height: 40 }} />
-      <Toast />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container:    { flex: 1, backgroundColor: BASE.bg, paddingHorizontal: 20 },
   header:       { marginTop: 60, alignItems: "center", marginBottom: 32 },
   headerIcon:   { width: 68, height: 68, borderRadius: 22, justifyContent: "center", alignItems: "center", marginBottom: 14 },

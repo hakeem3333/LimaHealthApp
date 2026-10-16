@@ -10,7 +10,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { BASE } from "../../utils/orgTheme";
+import { useThemedStyles } from "../../contexts/ThemeContext";
 
 const SEVERITY_STYLE = {
   CRITICAL: { color: "#EF4444", bg: "rgba(239, 68, 68, 0.14)", rank: 0 },
@@ -20,6 +20,7 @@ const SEVERITY_STYLE = {
 };
 
 export default function Caseload() {
+  const { styles, colors: BASE } = useThemedStyles(createStyles);
   const router = useRouter();
   const { theme, membersLabel, memberLabel } = useAuth();
 
@@ -161,7 +162,7 @@ export default function Caseload() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (BASE) => StyleSheet.create({
   container: { flex: 1, backgroundColor: BASE.bg },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BASE.bg },
 

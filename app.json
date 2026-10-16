@@ -31,19 +31,25 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 190,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#020617",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#020617"
           }
         }
       ],
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow LimaHealth to access your photos so you can set a profile picture."
+        }
+      ]
     ],
     "experiments": {
-      "reactCompiler": true
+      "reactCompiler": false
     }
   }
 }
